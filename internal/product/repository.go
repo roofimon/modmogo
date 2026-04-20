@@ -8,6 +8,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	mongodriver "go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	platformmongo "modmono/internal/platform/mongo"
 )
 
 // Repository persists products.
@@ -19,23 +21,36 @@ type Repository interface {
 
 // MongoRepository implements Repository using a MongoDB collection.
 type MongoRepository struct {
-	coll *mongodriver.Collection
+	lazy   *platformmongo.LazyClient
+	dbName string
 }
 
-// NewMongoRepository builds a Mongo-backed repository.
-func NewMongoRepository(db *mongodriver.Database) *MongoRepository {
-	return &MongoRepository{coll: db.Collection("products")}
+// NewMongoRepository builds a Mongo-backed repository. The lazy client connects on first use.
+func NewMongoRepository(lazy *platformmongo.LazyClient, dbName string) *MongoRepository {
+	return &MongoRepository{lazy: lazy, dbName: dbName}
+}
+
+func (r *MongoRepository) collection(ctx context.Context) (*mongodriver.Collection, error) {
+	client, err := r.lazy.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return client.Database(r.dbName).Collection("products"), nil
 }
 
 // Create inserts a product and returns it with server-assigned fields.
 func (r *MongoRepository) Create(ctx context.Context, p *Product) mo.Result[*Product] {
+	coll, err := r.collection(ctx)
+	if err != nil {
+		return mo.Err[*Product](err)
+	}
 	if p.ID.IsZero() {
 		p.ID = primitive.NewObjectID()
 	}
 	if p.CreatedAt.IsZero() {
 		p.CreatedAt = p.ID.Timestamp()
 	}
-	_, err := r.coll.InsertOne(ctx, p)
+	_, err = coll.InsertOne(ctx, p)
 	if err != nil {
 		return mo.Err[*Product](err)
 	}
@@ -44,8 +59,12 @@ func (r *MongoRepository) Create(ctx context.Context, p *Product) mo.Result[*Pro
 
 // GetByID returns Some(product) if found, None if missing, or an error for infrastructure failures.
 func (r *MongoRepository) GetByID(ctx context.Context, id primitive.ObjectID) (mo.Option[Product], error) {
+	coll, err := r.collection(ctx)
+	if err != nil {
+		return mo.None[Product](), err
+	}
 	var out Product
-	err := r.coll.FindOne(ctx, bson.M{"_id": id}).Decode(&out)
+	err = coll.FindOne(ctx, bson.M{"_id": id}).Decode(&out)
 	if err != nil {
 		if err == mongodriver.ErrNoDocuments {
 			return mo.None[Product](), nil
@@ -57,11 +76,15 @@ func (r *MongoRepository) GetByID(ctx context.Context, id primitive.ObjectID) (m
 
 // List returns up to limit products, newest first.
 func (r *MongoRepository) List(ctx context.Context, limit int64) mo.Result[[]Product] {
+	coll, err := r.collection(ctx)
+	if err != nil {
+		return mo.Err[[]Product](err)
+	}
 	if limit <= 0 {
 		limit = 50
 	}
 	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}).SetLimit(limit)
-	cur, err := r.coll.Find(ctx, bson.M{}, opts)
+	cur, err := coll.Find(ctx, bson.M{}, opts)
 	if err != nil {
 		return mo.Err[[]Product](err)
 	}

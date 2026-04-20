@@ -26,6 +26,7 @@ func Connect(ctx context.Context, uri string) (*mongodriver.Client, error) {
 }
 
 // ConnectIO wraps Connect as a fallible IO action. Nothing runs until Run().
+// LazyClient.Get uses this on the cold path so each first-connect attempt carries the caller's ctx.
 func ConnectIO(ctx context.Context, uri string) mo.IOEither[*mongodriver.Client] {
 	return mo.NewIOEither(func() (*mongodriver.Client, error) {
 		return Connect(ctx, uri)

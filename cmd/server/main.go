@@ -13,8 +13,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-	mongodriver "go.mongodb.org/mongo-driver/mongo"
 
+	"modmono/internal/health"
 	platformmongo "modmono/internal/platform/mongo"
 	"modmono/internal/product"
 )
@@ -40,31 +40,16 @@ func loadConfig() config {
 	}
 }
 
-func connectMongo(ctx context.Context, uri string) (*mongodriver.Client, func(), error) {
-	either := platformmongo.ConnectIO(ctx, uri).Run()
-	if either.IsLeft() {
-		return nil, nil, either.MustLeft()
-	}
-	client := either.MustRight()
-	cleanup := func() {
-		dctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := client.Disconnect(dctx); err != nil {
-			log.Printf("mongo disconnect: %v", err)
-		}
-	}
-	return client, cleanup, nil
-}
-
-func newProductService(client *mongodriver.Client, dbName string) *product.Service {
-	repo := product.NewMongoRepository(client.Database(dbName))
+func newProductService(lazy *platformmongo.LazyClient, dbName string) *product.Service {
+	repo := product.NewMongoRepository(lazy, dbName)
 	return product.NewService(repo)
 }
 
-func newFiberApp(svc *product.Service) *fiber.App {
+func newFiberApp(svc *product.Service, lazy *platformmongo.LazyClient) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "modmono"})
 	app.Use(recover.New(), requestid.New(), logger.New())
 	product.RegisterRoutes(app, svc)
+	health.RegisterRoutes(app, lazy)
 	return app
 }
 
@@ -90,14 +75,11 @@ func runHTTPServer(ctx context.Context, app *fiber.App, addr string) error {
 func run(ctx context.Context) error {
 	cfg := loadConfig()
 
-	client, cleanup, err := connectMongo(ctx, cfg.MongoURI)
-	if err != nil {
-		return fmt.Errorf("mongo connect: %w", err)
-	}
-	defer cleanup()
+	lazy := platformmongo.NewLazyClient(cfg.MongoURI)
+	defer lazy.Disconnect()
 
-	svc := newProductService(client, cfg.MongoDB)
-	app := newFiberApp(svc)
+	svc := newProductService(lazy, cfg.MongoDB)
+	app := newFiberApp(svc, lazy)
 
 	return runHTTPServer(ctx, app, cfg.HTTPAddr)
 }
