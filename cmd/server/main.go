@@ -92,6 +92,42 @@ func (a *productCatalogAdapter) ListActiveProducts(ctx context.Context, limit in
 	return out, nil
 }
 
+func (a *productCatalogAdapter) ResolveProductName(ctx context.Context, sku string) string {
+	opt, err := a.svc.GetBySKU(ctx, sku)
+	if err != nil || opt.IsAbsent() {
+		return ""
+	}
+	p, _ := opt.Get()
+	return p.Name
+}
+
+// customerCatalogAdapter adapts customer.Service to the order.CustomerCatalog port.
+type customerCatalogAdapter struct {
+	svc *customer.Service
+}
+
+func (a *customerCatalogAdapter) ListActiveCustomers(ctx context.Context, limit int64) ([]order.CatalogCustomer, error) {
+	res := a.svc.List(ctx, limit)
+	if res.IsError() {
+		return nil, res.Error()
+	}
+	customers := res.MustGet()
+	out := make([]order.CatalogCustomer, len(customers))
+	for i, c := range customers {
+		out[i] = order.CatalogCustomer{ID: c.ID.Hex(), Name: c.Name, Phone: c.Phone}
+	}
+	return out, nil
+}
+
+func (a *customerCatalogAdapter) ResolveCustomerName(ctx context.Context, hexID string) string {
+	opt, err := a.svc.GetByID(ctx, hexID)
+	if err != nil || opt.IsAbsent() {
+		return ""
+	}
+	c, _ := opt.Get()
+	return c.Name
+}
+
 func newFiberApp(
 	productSvc  *product.Service,
 	customerSvc *customer.Service,
@@ -110,7 +146,7 @@ func newFiberApp(
 	}
 	product.RegisterRoutes(app, productSvc)
 	customer.RegisterRoutes(app, customerSvc)
-	order.RegisterRoutes(app, orderSvc, &productCatalogAdapter{svc: productSvc})
+	order.RegisterRoutes(app, orderSvc, &productCatalogAdapter{svc: productSvc}, &customerCatalogAdapter{svc: customerSvc})
 	health.RegisterRoutes(app, lazy)
 	return app
 }

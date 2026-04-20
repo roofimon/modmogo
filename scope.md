@@ -52,6 +52,7 @@
 - Create a customer via modal (name, email).
 - View customer detail: name, email, created date, deactivated date (if any).
 - Deactivate a customer (soft-delete).
+- Add mobile phone number field
 
 ## Order
 - Browse active orders in a card grid showing item count, optional customer ID, and total; switch to Inactive tab for deactivated orders.
@@ -63,3 +64,5 @@
 - View order detail: line-items table (SKU / Qty / Unit Price / Subtotal) with a Total footer row; customer ID links to the customer detail page.
 - Deactivate an order (soft-delete — moves to Inactive list). No activate action.
 - Order total is computed at read time (never stored); the product catalog is fetched via `GET /orders/products` — the order domain defines its own `ProductCatalog` port so it does not import the product domain directly.
+- In Order detail it should display customer name and product name, so GetByID must query product and customer name from database. We must create order display model that contains 2 additional field. 
+- In Order detail it should have Payment Completed button. Once payment completed order service will create new Order which contains ID from original order but this one status marked as "PaymentCompleted"

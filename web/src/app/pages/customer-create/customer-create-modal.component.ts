@@ -24,8 +24,9 @@ export class CustomerCreateModalComponent {
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(500)]],
+    name:  ['', [Validators.required, Validators.maxLength(500)]],
     email: ['', [Validators.required, Validators.maxLength(320), Validators.email]],
+    phone: ['', Validators.maxLength(32)],
   });
 
   close(): void {
@@ -40,8 +41,9 @@ export class CustomerCreateModalComponent {
     }
     const v = this.form.getRawValue();
     this.submitting.set(true);
+    const phone = v.phone.trim();
     this.customersApi
-      .create({ name: v.name.trim(), email: v.email.trim() })
+      .create({ name: v.name.trim(), email: v.email.trim(), ...(phone && { phone }) })
       .subscribe({
         next: (c) => void this.router.navigate(['/customers', c.id]),
         error: (e: unknown) => {

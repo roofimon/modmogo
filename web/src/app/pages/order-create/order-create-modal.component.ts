@@ -4,7 +4,7 @@ import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 
-import { CatalogProduct } from '../../models/order';
+import { CatalogCustomer, CatalogProduct } from '../../models/order';
 import { OrderService } from '../../services/order.service';
 
 @Component({
@@ -23,9 +23,17 @@ export class OrderCreateModalComponent {
 
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
+
+  // SKU autocomplete
   readonly products = signal<CatalogProduct[]>([]);
   readonly activeSuggestionRow = signal<number | null>(null);
   readonly suggestions = signal<CatalogProduct[]>([]);
+
+  // Customer autocomplete
+  readonly allCustomers = signal<CatalogCustomer[]>([]);
+  readonly customerSearchText = signal('');
+  readonly customerSuggestions = signal<CatalogCustomer[]>([]);
+  readonly showCustomerDropdown = signal(false);
 
   readonly form = this.fb.nonNullable.group({
     customer_id: ['', Validators.pattern(/^$|^[0-9a-fA-F]{24}$/)],
@@ -35,6 +43,9 @@ export class OrderCreateModalComponent {
   constructor() {
     this.ordersApi.listProducts().subscribe({
       next: (items) => this.products.set(items ?? []),
+    });
+    this.ordersApi.listCustomers().subscribe({
+      next: (items) => this.allCustomers.set(items ?? []),
     });
   }
 
@@ -64,6 +75,34 @@ export class OrderCreateModalComponent {
     }
   }
 
+  // Customer autocomplete
+  onCustomerInput(value: string): void {
+    this.customerSearchText.set(value);
+    const q = value.trim().toLowerCase();
+    if (!q) {
+      this.form.controls.customer_id.setValue('');
+      this.customerSuggestions.set([]);
+      this.showCustomerDropdown.set(false);
+      return;
+    }
+    this.customerSuggestions.set(
+      this.allCustomers().filter((c) => c.name.toLowerCase().startsWith(q)).slice(0, 8),
+    );
+    this.showCustomerDropdown.set(true);
+  }
+
+  selectCustomer(c: CatalogCustomer): void {
+    this.form.controls.customer_id.setValue(c.id);
+    this.customerSearchText.set(c.name);
+    this.customerSuggestions.set([]);
+    this.showCustomerDropdown.set(false);
+  }
+
+  clearCustomerSuggestions(): void {
+    setTimeout(() => this.showCustomerDropdown.set(false), 150);
+  }
+
+  // SKU autocomplete
   onSkuInput(value: string, i: number): void {
     const q = value.trim().toLowerCase();
     if (!q) {

@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../environments/environment';
-import { CatalogProduct, CreateOrderRequest, Order } from '../models/order';
+import { CatalogCustomer, CatalogProduct, CreateOrderRequest, Order } from '../models/order';
 
 @Injectable({ providedIn: 'root' })
 export class OrderService {
@@ -27,6 +27,11 @@ export class OrderService {
     return this.http.post<Order>(`${environment.apiBaseUrl}/orders`, body);
   }
 
+  listCustomers(limit = 100): Observable<CatalogCustomer[]> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<CatalogCustomer[]>(`${environment.apiBaseUrl}/orders/customers`, { params });
+  }
+
   listProducts(limit = 100): Observable<CatalogProduct[]> {
     const params = new HttpParams().set('limit', String(limit));
     return this.http.get<CatalogProduct[]>(`${environment.apiBaseUrl}/orders/products`, { params });
@@ -35,6 +40,18 @@ export class OrderService {
   deactivate(id: string): Observable<Order> {
     return this.http.post<Order>(
       `${environment.apiBaseUrl}/orders/${encodeURIComponent(id)}/deactivate`,
+      {},
+    );
+  }
+
+  listPaymentCompleted(limit = 100): Observable<Order[]> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<Order[]>(`${environment.apiBaseUrl}/orders/payment-completed`, { params });
+  }
+
+  completePayment(id: string): Observable<Order> {
+    return this.http.post<Order>(
+      `${environment.apiBaseUrl}/orders/${encodeURIComponent(id)}/complete-payment`,
       {},
     );
   }

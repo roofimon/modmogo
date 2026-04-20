@@ -21,7 +21,10 @@
             <h1>Order <span class="order-id">{{ o.id }}</span></h1>
             @if (o.customer_id) {
               <p class="customer-link muted">
-                Customer: <a [routerLink]="['/customers', o.customer_id]" class="link-primary">{{ o.customer_id }}</a>
+                Customer:
+                <a [routerLink]="['/customers', o.customer_id]" class="link-primary">
+                  {{ o.customer_name || o.customer_id }}
+                </a>
               </p>
             }
           </header>
@@ -45,6 +48,7 @@
               <thead>
                 <tr>
                   <th>SKU</th>
+                  <th>Product</th>
                   <th class="num">Qty</th>
                   <th class="num">Unit Price</th>
                   <th class="num">Subtotal</th>
@@ -54,6 +58,7 @@
                 @for (item of o.items; track item.sku) {
                   <tr>
                     <td class="mono">{{ item.sku }}</td>
+                    <td class="product-name">{{ item.product_name || '—' }}</td>
                     <td class="num">{{ item.quantity }}</td>
                     <td class="num">{{ item.unit_price | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
                     <td class="num">{{ subtotal(item.quantity, item.unit_price) | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
@@ -62,15 +67,39 @@
               </tbody>
               <tfoot>
                 <tr>
-                  <td colspan="3" class="total-label">Total</td>
+                  <td colspan="4" class="total-label">Total</td>
                   <td class="num total-value">{{ o.total | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
 
+          @if (isPaymentCompleted(o)) {
+            <div class="status-badge-row">
+              <span class="badge-payment-completed">Payment Completed</span>
+              @if (o.original_order_id) {
+                <span class="badge-origin-label">
+                  Original order:
+                  <a [routerLink]="['/orders', o.original_order_id]" class="link-primary">{{ o.original_order_id }}</a>
+                </span>
+              }
+            </div>
+          }
           @if (!isInactive(o)) {
+            @if (paymentError()) {
+              <div class="banner banner-error" role="alert">{{ paymentError() }}</div>
+            }
             <div class="detail-actions">
+              @if (!isPaymentCompleted(o)) {
+                <button
+                  type="button"
+                  class="btn btn-success"
+                  [disabled]="paymentSubmitting()"
+                  (click)="completePayment()"
+                >
+                  {{ paymentSubmitting() ? 'Processing…' : 'Complete Payment' }}
+                </button>
+              }
               <button
                 type="button"
                 class="btn btn-danger"

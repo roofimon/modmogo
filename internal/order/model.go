@@ -13,14 +13,22 @@ type LineItem struct {
 	UnitPrice float64 `bson:"unit_price" json:"unit_price"`
 }
 
+// Status constants for Order.
+const (
+	StatusPending          = ""
+	StatusPaymentCompleted = "payment_completed"
+)
+
 // Order is the order aggregate root persisted in MongoDB.
 type Order struct {
-	ID            primitive.ObjectID  `bson:"_id,omitempty"            json:"id"`
-	CustomerID    *primitive.ObjectID `bson:"customer_id,omitempty"    json:"customer_id,omitempty"`
-	Items         []LineItem          `bson:"items"                    json:"items"`
-	Total         float64             `bson:"-"                        json:"total"`
-	CreatedAt     time.Time           `bson:"created_at"               json:"created_at"`
-	DeactivatedAt *time.Time          `bson:"deactivated_at,omitempty" json:"deactivated_at,omitempty"`
+	ID              primitive.ObjectID  `bson:"_id,omitempty"               json:"id"`
+	CustomerID      *primitive.ObjectID `bson:"customer_id,omitempty"       json:"customer_id,omitempty"`
+	Items           []LineItem          `bson:"items"                       json:"items"`
+	Total           float64             `bson:"-"                           json:"total"`
+	Status          string              `bson:"status,omitempty"            json:"status,omitempty"`
+	OriginalOrderID *primitive.ObjectID `bson:"original_order_id,omitempty" json:"original_order_id,omitempty"`
+	CreatedAt       time.Time           `bson:"created_at"                  json:"created_at"`
+	DeactivatedAt   *time.Time          `bson:"deactivated_at,omitempty"    json:"deactivated_at,omitempty"`
 }
 
 // ComputeTotal sets Total = sum(quantity * unit_price) for all items.

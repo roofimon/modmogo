@@ -21,6 +21,7 @@ var ErrNotFound = errors.New("product: not found")
 type Repository interface {
 	Create(ctx context.Context, p *Product) mo.Result[*Product]
 	GetByID(ctx context.Context, id primitive.ObjectID) (mo.Option[Product], error)
+	GetBySKU(ctx context.Context, sku string) (mo.Option[Product], error)
 	List(ctx context.Context, limit int64) mo.Result[[]Product]
 	ListInactive(ctx context.Context, limit int64) mo.Result[[]Product]
 	Deactivate(ctx context.Context, id primitive.ObjectID, at time.Time) mo.Result[*Product]
@@ -73,6 +74,23 @@ func (r *MongoRepository) GetByID(ctx context.Context, id primitive.ObjectID) (m
 	}
 	var out Product
 	err = coll.FindOne(ctx, bson.M{"_id": id}).Decode(&out)
+	if err != nil {
+		if err == mongodriver.ErrNoDocuments {
+			return mo.None[Product](), nil
+		}
+		return mo.None[Product](), err
+	}
+	return mo.Some(out), nil
+}
+
+// GetBySKU returns Some(product) if found by SKU, None if missing.
+func (r *MongoRepository) GetBySKU(ctx context.Context, sku string) (mo.Option[Product], error) {
+	coll, err := r.collection(ctx)
+	if err != nil {
+		return mo.None[Product](), err
+	}
+	var out Product
+	err = coll.FindOne(ctx, bson.M{"sku": sku}).Decode(&out)
 	if err != nil {
 		if err == mongodriver.ErrNoDocuments {
 			return mo.None[Product](), nil

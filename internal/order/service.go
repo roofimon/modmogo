@@ -18,6 +18,7 @@ var (
 	ErrInvalidUnitPrice  = errors.New("order: each line item unit_price must be >= 0")
 	ErrInvalidObjectID   = errors.New("order: invalid object id")
 	ErrInvalidCustomerID = errors.New("order: customer_id is not a valid object id")
+	ErrAlreadyCompleted  = errors.New("order: payment already completed")
 )
 
 // Service coordinates order use cases.
@@ -86,6 +87,11 @@ func (s *Service) ListInactive(ctx context.Context, limit int64) mo.Result[[]Ord
 	return s.repo.ListInactive(ctx, limit)
 }
 
+// ListPaymentCompleted returns payment-completed orders.
+func (s *Service) ListPaymentCompleted(ctx context.Context, limit int64) mo.Result[[]Order] {
+	return s.repo.ListPaymentCompleted(ctx, limit)
+}
+
 // Deactivate soft-deactivates an order.
 func (s *Service) Deactivate(ctx context.Context, id string) mo.Result[*Order] {
 	oid, err := parseObjectID(id)
@@ -93,6 +99,33 @@ func (s *Service) Deactivate(ctx context.Context, id string) mo.Result[*Order] {
 		return mo.Err[*Order](err)
 	}
 	return s.repo.Deactivate(ctx, oid, time.Now().UTC())
+}
+
+// CompletePayment creates a new payment-completed order derived from the given order ID.
+func (s *Service) CompletePayment(ctx context.Context, id string) mo.Result[*Order] {
+	oid, err := parseObjectID(id)
+	if err != nil {
+		return mo.Err[*Order](err)
+	}
+	opt, err := s.repo.GetByID(ctx, oid)
+	if err != nil {
+		return mo.Err[*Order](err)
+	}
+	if opt.IsAbsent() {
+		return mo.Err[*Order](ErrNotFound)
+	}
+	orig, _ := opt.Get()
+	if orig.Status == StatusPaymentCompleted {
+		return mo.Err[*Order](ErrAlreadyCompleted)
+	}
+	newOrder := &Order{
+		CustomerID:      orig.CustomerID,
+		Items:           orig.Items,
+		Status:          StatusPaymentCompleted,
+		OriginalOrderID: &orig.ID,
+		CreatedAt:       time.Now().UTC(),
+	}
+	return s.repo.Create(ctx, newOrder)
 }
 
 func parseObjectID(s string) (primitive.ObjectID, error) {

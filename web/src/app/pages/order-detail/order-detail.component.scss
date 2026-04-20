@@ -120,6 +120,11 @@
   text-align: right;
 }
 
+.product-name {
+  color: var(--color-fgMuted);
+  font-size: var(--fontSize-caption);
+}
+
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.9em;
@@ -154,6 +159,62 @@
   margin-top: var(--space-6);
   padding-top: var(--space-5);
   border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.status-badge-row {
+  margin-top: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.badge-payment-completed {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: rgba(0, 163, 92, 0.12);
+  color: var(--color-positive);
+  font-size: var(--fontSize-caption);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge-origin-label {
+  font-size: var(--fontSize-caption);
+  color: var(--color-fgMuted);
+}
+
+.btn-success {
+  background: var(--color-primary);
+  color: #fff;
+  border: 1px solid transparent;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  font-family: inherit;
+  font-size: var(--fontSize-body);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    filter: brightness(0.95);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-borderFocus);
+    outline-offset: 2px;
+  }
 }
 
 .btn-danger {

@@ -68,6 +68,11 @@ func parseObjectID(s string) (primitive.ObjectID, error) {
 	return id, nil
 }
 
+// GetBySKU loads a product by its SKU string.
+func (s *Service) GetBySKU(ctx context.Context, sku string) (mo.Option[Product], error) {
+	return s.repo.GetBySKU(ctx, sku)
+}
+
 // List returns active products ordered by creation time descending.
 func (s *Service) List(ctx context.Context, limit int64) mo.Result[[]Product] {
 	return s.repo.List(ctx, limit)

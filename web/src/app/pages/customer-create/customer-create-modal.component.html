@@ -27,6 +27,14 @@
           <span class="field-error">Enter a valid email.</span>
         }
       </label>
+
+      <label class="field">
+        <span class="label">Mobile Phone <span class="optional">(optional)</span></span>
+        <input class="input" type="tel" formControlName="phone" autocomplete="tel" placeholder="+1 555 000 0000" />
+        @if (form.controls.phone.touched && form.controls.phone.invalid) {
+          <span class="field-error">Max 32 characters.</span>
+        }
+      </label>
     </div>
 
     <div class="actions">

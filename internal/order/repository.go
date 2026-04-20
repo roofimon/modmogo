@@ -23,6 +23,7 @@ type Repository interface {
 	GetByID(ctx context.Context, id primitive.ObjectID) (mo.Option[Order], error)
 	List(ctx context.Context, limit int64) mo.Result[[]Order]
 	ListInactive(ctx context.Context, limit int64) mo.Result[[]Order]
+	ListPaymentCompleted(ctx context.Context, limit int64) mo.Result[[]Order]
 	Deactivate(ctx context.Context, id primitive.ObjectID, at time.Time) mo.Result[*Order]
 }
 
@@ -130,6 +131,38 @@ func (r *MongoRepository) ListInactive(ctx context.Context, limit int64) mo.Resu
 	inactive := bson.M{"deactivated_at": bson.M{"$exists": true, "$ne": nil}}
 	opts := options.Find().SetSort(bson.D{{Key: "deactivated_at", Value: -1}}).SetLimit(limit)
 	cur, err := coll.Find(ctx, inactive, opts)
+	if err != nil {
+		return mo.Err[[]Order](err)
+	}
+	defer cur.Close(ctx)
+
+	var items []Order
+	for cur.Next(ctx) {
+		var o Order
+		if err := cur.Decode(&o); err != nil {
+			return mo.Err[[]Order](err)
+		}
+		o.ComputeTotal()
+		items = append(items, o)
+	}
+	if err := cur.Err(); err != nil {
+		return mo.Err[[]Order](err)
+	}
+	return mo.Ok(items)
+}
+
+// ListPaymentCompleted returns up to limit payment-completed orders, newest first.
+func (r *MongoRepository) ListPaymentCompleted(ctx context.Context, limit int64) mo.Result[[]Order] {
+	coll, err := r.collection(ctx)
+	if err != nil {
+		return mo.Err[[]Order](err)
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	filter := bson.M{"status": StatusPaymentCompleted}
+	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}).SetLimit(limit)
+	cur, err := coll.Find(ctx, filter, opts)
 	if err != nil {
 		return mo.Err[[]Order](err)
 	}

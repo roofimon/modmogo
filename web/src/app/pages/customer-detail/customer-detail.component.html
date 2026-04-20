@@ -22,6 +22,12 @@
             <h1>{{ c.name }}</h1>
           </header>
           <dl class="detail-grid">
+            @if (c.phone) {
+              <div>
+                <dt>Mobile Phone</dt>
+                <dd>{{ c.phone }}</dd>
+              </div>
+            }
             <div>
               <dt>Created</dt>
               <dd>{{ c.created_at | date: 'medium' }}</dd>

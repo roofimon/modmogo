@@ -36,10 +36,12 @@ func (s *Service) Create(ctx context.Context, in CreateInput) mo.Result[*Custome
 	if email == "" {
 		return mo.Err[*Customer](ErrInvalidEmail)
 	}
+	phone := strings.TrimSpace(in.Phone)
 	now := time.Now().UTC()
 	c := &Customer{
 		Name:      name,
 		Email:     email,
+		Phone:     phone,
 		CreatedAt: now,
 	}
 	return s.repo.Create(ctx, c)

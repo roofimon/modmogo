@@ -142,6 +142,48 @@
   }
 }
 
+.customer-field {
+  position: relative;
+}
+
+.customer-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  margin: 2px 0 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  background: var(--color-bgPrimary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 2px 8px rgba(10, 11, 13, 0.1),
+    0 8px 24px rgba(10, 11, 13, 0.18);
+  max-height: 240px;
+  overflow-y: auto;
+
+  li {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--color-bgSecondary);
+    }
+  }
+}
+
+.sug-phone {
+  flex-shrink: 0;
+  font-size: var(--fontSize-caption);
+  color: var(--color-fgMuted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 .sku-field {
   position: relative;
 }

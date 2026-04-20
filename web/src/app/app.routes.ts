@@ -50,6 +50,13 @@ export const routes: Routes = [
         (m) => m.OrderInactiveListComponent,
       ),
   },
+  {
+    path: 'orders/payment-completed',
+    loadComponent: () =>
+      import('./pages/order-payment-completed-list/order-payment-completed-list.component').then(
+        (m) => m.OrderPaymentCompletedListComponent,
+      ),
+  },
   { path: 'orders/new', redirectTo: 'orders' },
   {
     path: 'orders/:id',

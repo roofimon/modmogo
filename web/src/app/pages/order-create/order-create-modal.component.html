@@ -12,19 +12,30 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()">
     <div class="fields">
-      <label class="field">
-        <span class="label">Customer ID <span class="optional">(optional)</span></span>
+      <div class="field customer-field">
+        <span class="label">Customer <span class="optional">(optional)</span></span>
         <input
           class="input"
           type="text"
-          formControlName="customer_id"
           autocomplete="off"
-          placeholder="24-character hex ObjectID"
+          placeholder="Search by name…"
+          [value]="customerSearchText()"
+          (input)="onCustomerInput($any($event.target).value)"
+          (blur)="clearCustomerSuggestions()"
         />
-        @if (form.controls['customer_id'].touched && form.controls['customer_id'].invalid) {
-          <span class="field-error">Must be a 24-character hex ID or leave blank.</span>
+        @if (showCustomerDropdown() && customerSuggestions().length) {
+          <ul class="customer-dropdown" role="listbox">
+            @for (c of customerSuggestions(); track c.id) {
+              <li role="option" (mousedown)="selectCustomer(c)">
+                <span class="sug-name">{{ c.name }}</span>
+                @if (c.phone) {
+                  <span class="sug-phone">{{ c.phone }}</span>
+                }
+              </li>
+            }
+          </ul>
         }
-      </label>
+      </div>
 
       <div class="items-section">
         <div class="items-header">
