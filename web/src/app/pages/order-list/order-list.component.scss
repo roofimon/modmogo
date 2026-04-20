@@ -47,6 +47,18 @@
   }
 }
 
+.badge {
+  align-self: flex-start;
+  font-size: var(--fontSize-caption);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 140, 0, 0.12);
+  color: #e07800;
+}
+
 .card-count {
   font-size: var(--fontSize-caption);
   font-weight: 600;
