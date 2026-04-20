@@ -16,7 +16,7 @@ From the repository root:
 docker compose up -d
 ```
 
-This starts MongoDB 7 on port **27017** (see [`docker-compose.yml`](docker-compose.yml)). The app defaults to `mongodb://localhost:27017`, so no extra configuration is required for local development.
+This starts MongoDB 7 on port **27017** (see [`docker-compose.yml`](docker-compose.yml)). The app defaults to `mongodb://localhost:27017`, so no extra configuration is required for local development. Collections include `products` and `customers`.
 
 ## Run the server
 
@@ -24,7 +24,7 @@ This starts MongoDB 7 on port **27017** (see [`docker-compose.yml`](docker-compo
 go run ./cmd/server
 ```
 
-The API listens on **:8080** by default. Product routes are under `/products` (for example `GET http://localhost:8080/products`).
+The API listens on **:8080** by default. Product routes are under `/products` and customer routes under `/customers` (for example `GET http://localhost:8080/products` and `GET http://localhost:8080/customers`). See [`api/openapi.yaml`](api/openapi.yaml) for the full contract.
 
 The process **does not** connect to MongoDB at startup. The client is created on first use (for example the first `/health/ready` check or `/products` request), so the HTTP server can start even if Mongo is still coming up. The first such call may take longer while it dials and pings the cluster.
 
@@ -60,7 +60,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:4200 go run ./cmd/server
 
 ## Web UI (Angular)
 
-The [`web/`](web/) app is a standalone Angular **19** SPA with a Coinbase Design System–inspired theme (SCSS tokens and Inter; not the React `@coinbase/cds-web` package). It talks to the same product API described in [`api/openapi.yaml`](api/openapi.yaml): catalog uses `GET /products` (active only); inactive inventory uses `GET /products/inactive`; detail uses `GET /products/{id}`; create uses `POST /products`; soft-deactivate uses `POST /products/{id}/deactivate`. The **Inactive** nav item opens the inactive list page.
+The [`web/`](web/) app is a standalone Angular **19** SPA with a Coinbase Design System–inspired theme (SCSS tokens and Inter; not the React `@coinbase/cds-web` package). A **left sidebar** groups **Products** (catalog, inactive list, add) and **Customers** (directory, inactive list, add). It calls the APIs in [`api/openapi.yaml`](api/openapi.yaml): products use `GET /products`, `GET /products/inactive`, `GET /products/{id}`, `POST /products`, and `POST /products/{id}/deactivate`; customers use the parallel `/customers` routes.
 
 From the repository root:
 
@@ -70,11 +70,11 @@ bun install
 bun run start
 ```
 
-By default `bun run start` (`ng serve`) runs at **http://localhost:4200**. Development uses relative API URLs and [`web/proxy.conf.json`](web/proxy.conf.json) to forward `/products` and `/health` to **http://localhost:8080**, so you do **not** need CORS for local UI development as long as the API is listening on 8080.
+By default `bun run start` (`ng serve`) runs at **http://localhost:4200**. Development uses relative API URLs and [`web/proxy.conf.json`](web/proxy.conf.json) to forward `/products`, `/customers`, and `/health` to **http://localhost:8080**, so you do **not** need CORS for local UI development as long as the API is listening on 8080.
 
 If you point the SPA at the API with an absolute URL (e.g. `apiBaseUrl: 'http://localhost:8080'`) instead of the proxy, set `CORS_ALLOWED_ORIGINS` to the exact origin you use in the browser (including scheme and host, e.g. `http://localhost:4200` vs `http://127.0.0.1:4200`). A mismatch there often surfaces in Angular as **status 0** / “unknown” errors.
 
-Production builds use `src/environments/environment.ts` with `apiBaseUrl` **`''`**, so requests are same-origin relative URLs (e.g. `/products`). Point that at your API with a reverse proxy or change the value for your deployment.
+Production builds use `src/environments/environment.ts` with `apiBaseUrl` **`''`**, so requests are same-origin relative URLs (e.g. `/products`, `/customers`). Point that at your API with a reverse proxy or change the value for your deployment.
 
 ```bash
 cd web

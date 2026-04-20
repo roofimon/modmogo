@@ -16,7 +16,9 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 
+	"modmono/internal/customer"
 	"modmono/internal/health"
+	"modmono/internal/order"
 	platformmongo "modmono/internal/platform/mongo"
 	"modmono/internal/product"
 )
@@ -62,7 +64,23 @@ func newProductService(lazy *platformmongo.LazyClient, dbName string) *product.S
 	return product.NewService(repo)
 }
 
-func newFiberApp(svc *product.Service, lazy *platformmongo.LazyClient, cfg config) *fiber.App {
+func newCustomerService(lazy *platformmongo.LazyClient, dbName string) *customer.Service {
+	repo := customer.NewMongoRepository(lazy, dbName)
+	return customer.NewService(repo)
+}
+
+func newOrderService(lazy *platformmongo.LazyClient, dbName string) *order.Service {
+	repo := order.NewMongoRepository(lazy, dbName)
+	return order.NewService(repo)
+}
+
+func newFiberApp(
+	productSvc  *product.Service,
+	customerSvc *customer.Service,
+	orderSvc    *order.Service,
+	lazy        *platformmongo.LazyClient,
+	cfg         config,
+) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "modmono"})
 	app.Use(recover.New(), requestid.New(), logger.New())
 	if allow := corsAllowOrigins(cfg.CORSAllowedOrigins); allow != "" {
@@ -72,7 +90,9 @@ func newFiberApp(svc *product.Service, lazy *platformmongo.LazyClient, cfg confi
 			AllowHeaders: "Origin,Content-Type,Accept,Authorization,X-Requested-With",
 		}))
 	}
-	product.RegisterRoutes(app, svc)
+	product.RegisterRoutes(app, productSvc)
+	customer.RegisterRoutes(app, customerSvc)
+	order.RegisterRoutes(app, orderSvc)
 	health.RegisterRoutes(app, lazy)
 	return app
 }
@@ -98,12 +118,16 @@ func runHTTPServer(ctx context.Context, app *fiber.App, addr string) error {
 
 func run(ctx context.Context) error {
 	cfg := loadConfig()
-
+	// Create a single lazy client for the app to use.
+	// It will connect on first use and disconnect when the app shuts down.
 	lazy := platformmongo.NewLazyClient(cfg.MongoURI)
 	defer lazy.Disconnect()
-
-	svc := newProductService(lazy, cfg.MongoDB)
-	app := newFiberApp(svc, lazy, cfg)
+	// Wired up services and handlers here, passing the lazy client and db name as needed.
+	productSvc  := newProductService(lazy, cfg.MongoDB)
+	customerSvc := newCustomerService(lazy, cfg.MongoDB)
+	orderSvc    := newOrderService(lazy, cfg.MongoDB)
+	// Create the fiber app with all routes and handlers.
+	app := newFiberApp(productSvc, customerSvc, orderSvc, lazy, cfg)
 
 	return runHTTPServer(ctx, app, cfg.HTTPAddr)
 }

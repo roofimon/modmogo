@@ -1,0 +1,101 @@
+<div class="modal-backdrop" (click)="close()"></div>
+
+<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <header class="modal-header">
+    <h2 id="modal-title">Add order</h2>
+    <button type="button" class="close-btn" (click)="close()" aria-label="Close">✕</button>
+  </header>
+
+  @if (error()) {
+    <div class="banner banner-error" role="alert">{{ error() }}</div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="fields">
+      <label class="field">
+        <span class="label">Customer ID <span class="optional">(optional)</span></span>
+        <input
+          class="input"
+          type="text"
+          formControlName="customer_id"
+          autocomplete="off"
+          placeholder="24-character hex ObjectID"
+        />
+        @if (form.controls['customer_id'].touched && form.controls['customer_id'].invalid) {
+          <span class="field-error">Must be a 24-character hex ID or leave blank.</span>
+        }
+      </label>
+
+      <div class="items-section">
+        <div class="items-header">
+          <span class="label">Line Items</span>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="addItem()">+ Add item</button>
+        </div>
+
+        <div formArrayName="items">
+          @for (item of items.controls; track $index; let i = $index) {
+            <div class="item-row" [formGroupName]="i">
+              <label class="field sku-field">
+                <span class="label">SKU</span>
+                <input
+                  class="input"
+                  type="text"
+                  formControlName="sku"
+                  autocomplete="off"
+                  (input)="onSkuInput($any($event.target).value, i)"
+                  (blur)="clearSuggestions()"
+                />
+                @if (activeSuggestionRow() === i && suggestions().length) {
+                  <ul class="sku-dropdown" role="listbox">
+                    @for (p of suggestions(); track p.id) {
+                      <li role="option" (mousedown)="selectSku(p, i)">
+                        <span class="sug-sku">{{ p.sku }}</span>
+                        <span class="sug-name">{{ p.name }}</span>
+                        <span class="sug-price">{{ p.price | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+                @if (itemAt(i).controls['sku'].touched && itemAt(i).controls['sku'].invalid) {
+                  <span class="field-error">Required.</span>
+                }
+              </label>
+
+              <label class="field">
+                <span class="label">Qty</span>
+                <input class="input" type="number" formControlName="quantity" min="1" step="1" />
+                @if (itemAt(i).controls['quantity'].touched && itemAt(i).controls['quantity'].invalid) {
+                  <span class="field-error">Min 1.</span>
+                }
+              </label>
+
+              <label class="field">
+                <span class="label">Unit Price</span>
+                <input class="input" type="number" formControlName="unit_price" min="0" step="0.01" />
+                @if (itemAt(i).controls['unit_price'].touched && itemAt(i).controls['unit_price'].invalid) {
+                  <span class="field-error">Enter ≥ 0.</span>
+                }
+              </label>
+
+              @if (items.length > 1) {
+                <button
+                  type="button"
+                  class="btn-remove-item"
+                  (click)="removeItem(i)"
+                  aria-label="Remove item"
+                >✕</button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Creating…' : 'Create order' }}
+      </button>
+      <button type="button" class="btn btn-ghost" (click)="close()">Cancel</button>
+    </div>
+  </form>
+</div>

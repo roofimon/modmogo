@@ -38,5 +38,23 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/customer-detail/customer-detail.component').then((m) => m.CustomerDetailComponent),
   },
+  {
+    path: 'orders',
+    loadComponent: () =>
+      import('./pages/order-list/order-list.component').then((m) => m.OrderListComponent),
+  },
+  {
+    path: 'orders/inactive',
+    loadComponent: () =>
+      import('./pages/order-inactive-list/order-inactive-list.component').then(
+        (m) => m.OrderInactiveListComponent,
+      ),
+  },
+  { path: 'orders/new', redirectTo: 'orders' },
+  {
+    path: 'orders/:id',
+    loadComponent: () =>
+      import('./pages/order-detail/order-detail.component').then((m) => m.OrderDetailComponent),
+  },
   { path: '**', redirectTo: 'products' },
 ];

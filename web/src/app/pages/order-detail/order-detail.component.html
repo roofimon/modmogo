@@ -1,0 +1,88 @@
+<section class="page">
+  <a routerLink="/orders" class="back-link">← Orders</a>
+
+  @if (loading()) {
+    <p class="muted">Loading…</p>
+  } @else {
+    @if (error()) {
+      <div class="banner banner-error" role="alert">{{ error() }}</div>
+    } @else {
+      @if (order(); as o) {
+        @if (isInactive(o)) {
+          <div class="banner banner-inactive" role="status">
+            This order is <strong>inactive</strong>.
+          </div>
+        }
+        @if (deactivateError()) {
+          <div class="banner banner-error" role="alert">{{ deactivateError() }}</div>
+        }
+        <article class="detail-card">
+          <header class="detail-header">
+            <h1>Order <span class="order-id">{{ o.id }}</span></h1>
+            @if (o.customer_id) {
+              <p class="customer-link muted">
+                Customer: <a [routerLink]="['/customers', o.customer_id]" class="link-primary">{{ o.customer_id }}</a>
+              </p>
+            }
+          </header>
+
+          <dl class="detail-grid">
+            <div>
+              <dt>Created</dt>
+              <dd>{{ o.created_at | date: 'medium' }}</dd>
+            </div>
+            @if (o.deactivated_at) {
+              <div>
+                <dt>Deactivated</dt>
+                <dd>{{ o.deactivated_at | date: 'medium' }}</dd>
+              </div>
+            }
+          </dl>
+
+          <div class="items-section">
+            <h2 class="section-label">Line Items</h2>
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th class="num">Qty</th>
+                  <th class="num">Unit Price</th>
+                  <th class="num">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of o.items; track item.sku) {
+                  <tr>
+                    <td class="mono">{{ item.sku }}</td>
+                    <td class="num">{{ item.quantity }}</td>
+                    <td class="num">{{ item.unit_price | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
+                    <td class="num">{{ subtotal(item.quantity, item.unit_price) | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" class="total-label">Total</td>
+                  <td class="num total-value">{{ o.total | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          @if (!isInactive(o)) {
+            <div class="detail-actions">
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="deactivateSubmitting()"
+                (click)="confirmDeactivate()"
+              >
+                {{ deactivateSubmitting() ? 'Deactivating…' : 'Deactivate order' }}
+              </button>
+            </div>
+          }
+        </article>
+      }
+    }
+  }
+</section>
