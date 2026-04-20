@@ -47,23 +47,16 @@
   }
 }
 
-.card-sku {
+.card-email {
   font-size: var(--fontSize-caption);
   font-weight: 600;
   color: var(--color-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  line-height: 1.35;
+  word-break: break-all;
 }
 
 .card-title {
   font-size: var(--fontSize-body);
   font-weight: 500;
   line-height: 1.35;
-}
-
-.card-price {
-  margin-top: auto;
-  font-size: var(--fontSize-body);
-  font-weight: 600;
-  color: var(--color-fgPrimary);
 }

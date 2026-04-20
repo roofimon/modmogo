@@ -1,0 +1,38 @@
+@if (showCreateModal()) {
+  <app-customer-create-modal (closed)="showCreateModal.set(false)" />
+}
+
+<section class="page">
+  <header class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Customers</h1>
+        <p class="muted">Active customers from the modmono API, newest first.</p>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" (click)="showCreateModal.set(true)">Add customer</button>
+    </div>
+    <nav class="section-tabs">
+      <a routerLink="/customers" routerLinkActive="tab-active" [routerLinkActiveOptions]="{ exact: true }">Active</a>
+      <a routerLink="/customers/inactive" routerLinkActive="tab-active">Inactive</a>
+    </nav>
+  </header>
+
+  @if (loading()) {
+    <p class="muted">Loading…</p>
+  } @else if (error()) {
+    <div class="banner banner-error" role="alert">{{ error() }}</div>
+  } @else if (customers().length === 0) {
+    <p class="muted">No customers yet. <a routerLink="/customers/new">Add one</a>.</p>
+  } @else {
+    <ul class="card-grid">
+      @for (c of customers(); track c.id) {
+        <li>
+          <a class="card" [routerLink]="['/customers', c.id]">
+            <span class="card-email">{{ c.email }}</span>
+            <span class="card-title">{{ c.name }}</span>
+          </a>
+        </li>
+      }
+    </ul>
+  }
+</section>

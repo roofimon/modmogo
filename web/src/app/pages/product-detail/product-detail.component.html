@@ -1,5 +1,5 @@
 <section class="page">
-  <a routerLink="/products" class="back-link">← Back to catalog</a>
+  <a routerLink="/products" class="back-link">← Products</a>
 
   @if (loading()) {
     <p class="muted">Loading…</p>
@@ -15,6 +15,9 @@
         }
         @if (deactivateError()) {
           <div class="banner banner-error" role="alert">{{ deactivateError() }}</div>
+        }
+        @if (activateError()) {
+          <div class="banner banner-error" role="alert">{{ activateError() }}</div>
         }
         <article class="detail-card">
           <header class="detail-header">
@@ -41,8 +44,17 @@
               <dd class="mono">{{ p.id }}</dd>
             </div>
           </dl>
-          @if (!isInactive(p)) {
-            <div class="detail-actions">
+          <div class="detail-actions">
+            @if (isInactive(p)) {
+              <button
+                type="button"
+                class="btn btn-activate"
+                [disabled]="activateSubmitting()"
+                (click)="confirmActivate()"
+              >
+                {{ activateSubmitting() ? 'Activating…' : 'Activate product' }}
+              </button>
+            } @else {
               <button
                 type="button"
                 class="btn btn-danger"
@@ -51,8 +63,8 @@
               >
                 {{ deactivateSubmitting() ? 'Deactivating…' : 'Deactivate product' }}
               </button>
-            </div>
-          }
+            }
+          </div>
         </article>
       }
     }

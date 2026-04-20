@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: modmono
-  description: HTTP API for the modmono Fiber service (products and health probes).
+  description: HTTP API for the modmono Fiber service (products, customers, and health probes).
   version: 0.1.0
 servers:
   - url: http://localhost:8080
@@ -119,6 +119,47 @@ paths:
               schema:
                 type: string
 
+  /products/{id}/activate:
+    post:
+      summary: Activate product
+      description: Clears deactivated_at, restoring the product to the active catalog. Idempotent.
+      operationId: activateProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: MongoDB ObjectID as 24-character hexadecimal string.
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{24}$'
+      responses:
+        "200":
+          description: Product activated (or already active).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: ID is not a valid ObjectID hex.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid product id
+        "404":
+          description: Product does not exist.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: product not found
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /products/{id}/deactivate:
     post:
       summary: Deactivate product
@@ -200,6 +241,198 @@ paths:
               schema:
                 type: string
 
+  /customers:
+    get:
+      summary: List customers
+      description: Returns active (non-deactivated) customers ordered by creation time descending. Default limit is 50; maximum is 100.
+      operationId: listCustomers
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of customers to return (1–100). Values above 100 are capped at 100.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: List of customers (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+        "400":
+          description: Invalid limit query parameter.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid limit
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      summary: Create customer
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomerRequest"
+      responses:
+        "201":
+          description: Customer created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          description: Invalid JSON body or validation error (e.g. empty name or email).
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                invalidJson:
+                  value: invalid JSON body
+                invalidName:
+                  value: customer: name is required
+                invalidEmail:
+                  value: customer: email is required
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /customers/inactive:
+    get:
+      summary: List inactive customers
+      description: Returns deactivated customers only, ordered by deactivated_at descending. Same limit rules as GET /customers.
+      operationId: listInactiveCustomers
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of customers to return (1–100). Values above 100 are capped at 100.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: List of inactive customers (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+        "400":
+          description: Invalid limit query parameter.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid limit
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /customers/{id}/deactivate:
+    post:
+      summary: Deactivate customer
+      description: Soft-deactivates the customer (sets deactivated_at). Idempotent; returns the updated customer. Deactivated customers are omitted from GET /customers.
+      operationId: deactivateCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: MongoDB ObjectID as 24-character hexadecimal string.
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{24}$'
+      responses:
+        "200":
+          description: Customer deactivated (or already inactive; timestamp may be refreshed).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          description: ID is not a valid ObjectID hex.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid customer id
+        "404":
+          description: Customer does not exist.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: customer not found
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /customers/{id}:
+    get:
+      summary: Get customer by ID
+      operationId: getCustomerById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: MongoDB ObjectID as 24-character hexadecimal string.
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{24}$'
+      responses:
+        "200":
+          description: Customer found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          description: ID is not a valid ObjectID hex.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid customer id
+        "404":
+          description: Customer does not exist.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: customer not found
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /health/live:
     get:
       summary: Liveness probe
@@ -270,3 +503,42 @@ components:
           type: number
           format: double
           minimum: 0
+
+    Customer:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - created_at
+      properties:
+        id:
+          type: string
+          description: MongoDB ObjectID as hex string.
+          example: 507f1f77bcf86cd799439011
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        created_at:
+          type: string
+          format: date-time
+          description: UTC timestamp set by the server on create.
+        deactivated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When set, the customer is inactive and excluded from list.
+
+    CreateCustomerRequest:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email

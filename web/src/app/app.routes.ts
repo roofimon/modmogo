@@ -14,15 +14,29 @@ export const routes: Routes = [
         (m) => m.ProductInactiveListComponent,
       ),
   },
-  {
-    path: 'products/new',
-    loadComponent: () =>
-      import('./pages/product-create/product-create.component').then((m) => m.ProductCreateComponent),
-  },
+  { path: 'products/new', redirectTo: 'products' },
   {
     path: 'products/:id',
     loadComponent: () =>
       import('./pages/product-detail/product-detail.component').then((m) => m.ProductDetailComponent),
+  },
+  {
+    path: 'customers',
+    loadComponent: () =>
+      import('./pages/customer-list/customer-list.component').then((m) => m.CustomerListComponent),
+  },
+  {
+    path: 'customers/inactive',
+    loadComponent: () =>
+      import('./pages/customer-inactive-list/customer-inactive-list.component').then(
+        (m) => m.CustomerInactiveListComponent,
+      ),
+  },
+  { path: 'customers/new', redirectTo: 'customers' },
+  {
+    path: 'customers/:id',
+    loadComponent: () =>
+      import('./pages/customer-detail/customer-detail.component').then((m) => m.CustomerDetailComponent),
   },
   { path: '**', redirectTo: 'products' },
 ];

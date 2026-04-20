@@ -34,4 +34,11 @@ export class ProductService {
       {},
     );
   }
+
+  activate(id: string): Observable<Product> {
+    return this.http.post<Product>(
+      `${environment.apiBaseUrl}/products/${encodeURIComponent(id)}/activate`,
+      {},
+    );
+  }
 }

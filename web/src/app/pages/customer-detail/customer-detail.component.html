@@ -1,0 +1,56 @@
+<section class="page">
+  <a routerLink="/customers" class="back-link">← Customers</a>
+
+  @if (loading()) {
+    <p class="muted">Loading…</p>
+  } @else {
+    @if (error()) {
+      <div class="banner banner-error" role="alert">{{ error() }}</div>
+    } @else {
+      @if (customer(); as c) {
+        @if (isInactive(c)) {
+          <div class="banner banner-inactive" role="status">
+            This customer is <strong>inactive</strong> and no longer appears in the directory.
+          </div>
+        }
+        @if (deactivateError()) {
+          <div class="banner banner-error" role="alert">{{ deactivateError() }}</div>
+        }
+        <article class="detail-card">
+          <header class="detail-header">
+            <span class="detail-email">{{ c.email }}</span>
+            <h1>{{ c.name }}</h1>
+          </header>
+          <dl class="detail-grid">
+            <div>
+              <dt>Created</dt>
+              <dd>{{ c.created_at | date: 'medium' }}</dd>
+            </div>
+            @if (c.deactivated_at) {
+              <div>
+                <dt>Deactivated</dt>
+                <dd>{{ c.deactivated_at | date: 'medium' }}</dd>
+              </div>
+            }
+            <div>
+              <dt>ID</dt>
+              <dd class="mono">{{ c.id }}</dd>
+            </div>
+          </dl>
+          @if (!isInactive(c)) {
+            <div class="detail-actions">
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="deactivateSubmitting()"
+                (click)="confirmDeactivate()"
+              >
+                {{ deactivateSubmitting() ? 'Deactivating…' : 'Deactivate customer' }}
+              </button>
+            </div>
+          }
+        </article>
+      }
+    }
+  }
+</section>

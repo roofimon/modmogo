@@ -1,4 +1,4 @@
-package product
+package customer
 
 import (
 	"errors"
@@ -10,14 +10,13 @@ import (
 const defaultListLimit int64 = 50
 const maxListLimit int64 = 100
 
-// RegisterRoutes mounts product HTTP routes on app.
+// RegisterRoutes mounts customer HTTP routes on app.
 func RegisterRoutes(app *fiber.App, svc *Service) {
-	g := app.Group("/products")
+	g := app.Group("/customers")
 	g.Post("/", handleCreate(svc))
 	g.Get("/", handleList(svc))
 	g.Get("/inactive", handleListInactive(svc))
 	g.Post("/:id/deactivate", handleDeactivate(svc))
-	g.Post("/:id/activate", handleActivate(svc))
 	g.Get("/:id", handleGetByID(svc))
 }
 
@@ -29,7 +28,7 @@ func handleCreate(svc *Service) fiber.Handler {
 		}
 		res := svc.Create(c.UserContext(), body)
 		if res.IsError() {
-			if errors.Is(res.Error(), ErrInvalidName) || errors.Is(res.Error(), ErrInvalidPrice) {
+			if errors.Is(res.Error(), ErrInvalidName) || errors.Is(res.Error(), ErrInvalidEmail) {
 				return fiber.NewError(fiber.StatusBadRequest, res.Error().Error())
 			}
 			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
@@ -44,32 +43,15 @@ func handleGetByID(svc *Service) fiber.Handler {
 		opt, err := svc.GetByID(c.UserContext(), id)
 		if err != nil {
 			if errors.Is(err, ErrInvalidObjectID) {
-				return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
+				return fiber.NewError(fiber.StatusBadRequest, "invalid customer id")
 			}
 			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 		}
 		if opt.IsAbsent() {
-			return fiber.NewError(fiber.StatusNotFound, "product not found")
+			return fiber.NewError(fiber.StatusNotFound, "customer not found")
 		}
-		p, _ := opt.Get()
-		return c.JSON(p)
-	}
-}
-
-func handleActivate(svc *Service) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		id := c.Params("id")
-		res := svc.Activate(c.UserContext(), id)
-		if res.IsError() {
-			if errors.Is(res.Error(), ErrInvalidObjectID) {
-				return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
-			}
-			if errors.Is(res.Error(), ErrNotFound) {
-				return fiber.NewError(fiber.StatusNotFound, "product not found")
-			}
-			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
-		}
-		return c.JSON(res.MustGet())
+		cust, _ := opt.Get()
+		return c.JSON(cust)
 	}
 }
 
@@ -79,10 +61,10 @@ func handleDeactivate(svc *Service) fiber.Handler {
 		res := svc.Deactivate(c.UserContext(), id)
 		if res.IsError() {
 			if errors.Is(res.Error(), ErrInvalidObjectID) {
-				return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
+				return fiber.NewError(fiber.StatusBadRequest, "invalid customer id")
 			}
 			if errors.Is(res.Error(), ErrNotFound) {
-				return fiber.NewError(fiber.StatusNotFound, "product not found")
+				return fiber.NewError(fiber.StatusNotFound, "customer not found")
 			}
 			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
@@ -117,7 +99,7 @@ func handleList(svc *Service) fiber.Handler {
 		}
 		items := res.MustGet()
 		if items == nil {
-			items = []Product{}
+			items = []Customer{}
 		}
 		return c.JSON(items)
 	}
@@ -135,7 +117,7 @@ func handleListInactive(svc *Service) fiber.Handler {
 		}
 		items := res.MustGet()
 		if items == nil {
-			items = []Product{}
+			items = []Customer{}
 		}
 		return c.JSON(items)
 	}

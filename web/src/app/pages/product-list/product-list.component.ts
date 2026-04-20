@@ -1,14 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { Product } from '../../models/product';
 import { ProductService } from '../../services/product.service';
+import { ProductCreateModalComponent } from '../product-create/product-create-modal.component';
 
 @Component({
   selector: 'app-product-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, RouterLinkActive, ProductCreateModalComponent],
   templateUrl: './product-list.component.html',
   styleUrl: './product-list.component.scss',
 })
@@ -18,6 +19,7 @@ export class ProductListComponent {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly products = signal<Product[]>([]);
+  readonly showCreateModal = signal(false);
 
   constructor() {
     this.productsApi.list(100).subscribe({

@@ -1,0 +1,37 @@
+<section class="page">
+  <a routerLink="/customers" class="back-link">← Customers</a>
+
+  <header class="page-header">
+    <h1>Add customer</h1>
+    <p class="muted">Creates a customer via <code>POST /customers</code>.</p>
+  </header>
+
+  @if (error()) {
+    <div class="banner banner-error" role="alert">{{ error() }}</div>
+  }
+
+  <form class="form-card" [formGroup]="form" (ngSubmit)="submit()">
+    <label class="field">
+      <span class="label">Name</span>
+      <input class="input" type="text" formControlName="name" autocomplete="name" />
+      @if (form.controls.name.touched && form.controls.name.invalid) {
+        <span class="field-error">Name is required.</span>
+      }
+    </label>
+
+    <label class="field">
+      <span class="label">Email</span>
+      <input class="input" type="email" formControlName="email" autocomplete="email" />
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+        <span class="field-error">Enter a valid email.</span>
+      }
+    </label>
+
+    <div class="actions">
+      <button class="btn btn-primary" type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Creating…' : 'Create customer' }}
+      </button>
+      <a routerLink="/customers" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</section>

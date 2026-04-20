@@ -24,6 +24,7 @@ type Repository interface {
 	List(ctx context.Context, limit int64) mo.Result[[]Product]
 	ListInactive(ctx context.Context, limit int64) mo.Result[[]Product]
 	Deactivate(ctx context.Context, id primitive.ObjectID, at time.Time) mo.Result[*Product]
+	Activate(ctx context.Context, id primitive.ObjectID) mo.Result[*Product]
 }
 
 // MongoRepository implements Repository using a MongoDB collection.
@@ -144,6 +145,28 @@ func (r *MongoRepository) ListInactive(ctx context.Context, limit int64) mo.Resu
 		return mo.Err[[]Product](err)
 	}
 	return mo.Ok(items)
+}
+
+// Activate clears deactivated_at, restoring the product to the active catalog. Idempotent.
+func (r *MongoRepository) Activate(ctx context.Context, id primitive.ObjectID) mo.Result[*Product] {
+	coll, err := r.collection(ctx)
+	if err != nil {
+		return mo.Err[*Product](err)
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var out Product
+	err = coll.FindOneAndUpdate(ctx,
+		bson.M{"_id": id},
+		bson.M{"$unset": bson.M{"deactivated_at": ""}},
+		opts,
+	).Decode(&out)
+	if err != nil {
+		if err == mongodriver.ErrNoDocuments {
+			return mo.Err[*Product](ErrNotFound)
+		}
+		return mo.Err[*Product](err)
+	}
+	return mo.Ok(&out)
 }
 
 // Deactivate sets deactivated_at and returns the updated document. Idempotent: repeated calls refresh the timestamp.

@@ -1,0 +1,47 @@
+<div class="modal-backdrop" (click)="close()"></div>
+
+<div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <header class="modal-header">
+    <h2 id="modal-title">Add product</h2>
+    <button type="button" class="close-btn" (click)="close()" aria-label="Close">✕</button>
+  </header>
+
+  @if (error()) {
+    <div class="banner banner-error" role="alert">{{ error() }}</div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="fields">
+      <label class="field">
+        <span class="label">SKU</span>
+        <input class="input" type="text" formControlName="sku" autocomplete="off" />
+        @if (form.controls.sku.touched && form.controls.sku.invalid) {
+          <span class="field-error">SKU is required.</span>
+        }
+      </label>
+
+      <label class="field">
+        <span class="label">Name</span>
+        <input class="input" type="text" formControlName="name" autocomplete="off" />
+        @if (form.controls.name.touched && form.controls.name.invalid) {
+          <span class="field-error">Name is required.</span>
+        }
+      </label>
+
+      <label class="field">
+        <span class="label">Price (USD)</span>
+        <input class="input" type="number" formControlName="price" min="0" step="0.01" />
+        @if (form.controls.price.touched && form.controls.price.invalid) {
+          <span class="field-error">Enter a non-negative price.</span>
+        }
+      </label>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Creating…' : 'Create product' }}
+      </button>
+      <button type="button" class="btn btn-ghost" (click)="close()">Cancel</button>
+    </div>
+  </form>
+</div>

@@ -23,6 +23,8 @@ export class ProductDetailComponent {
   readonly product = signal<Product | null>(null);
   readonly deactivateSubmitting = signal(false);
   readonly deactivateError = signal<string | null>(null);
+  readonly activateSubmitting = signal(false);
+  readonly activateError = signal<string | null>(null);
 
   constructor() {
     this.route.paramMap
@@ -57,6 +59,34 @@ export class ProductDetailComponent {
 
   isInactive(p: Product): boolean {
     return p.deactivated_at != null && p.deactivated_at !== '';
+  }
+
+  confirmActivate(): void {
+    if (!confirm('Activate this product? It will reappear in the catalog.')) {
+      return;
+    }
+    const p = this.product();
+    if (!p) return;
+    this.activateError.set(null);
+    this.activateSubmitting.set(true);
+    this.productsApi.activate(p.id).subscribe({
+      next: (updated) => {
+        this.product.set(updated);
+        this.activateSubmitting.set(false);
+      },
+      error: (e: unknown) => {
+        const msg =
+          e instanceof HttpErrorResponse
+            ? typeof e.error === 'string'
+              ? e.error
+              : e.message
+            : e instanceof Error
+              ? e.message
+              : 'Could not activate';
+        this.activateError.set(msg);
+        this.activateSubmitting.set(false);
+      },
+    });
   }
 
   confirmDeactivate(): void {

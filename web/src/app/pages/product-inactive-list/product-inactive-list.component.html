@@ -1,7 +1,20 @@
+@if (showCreateModal()) {
+  <app-product-create-modal (closed)="showCreateModal.set(false)" />
+}
+
 <section class="page">
   <header class="page-header">
-    <h1>Inactive products</h1>
-    <p class="muted">Soft-deactivated items (not shown in the <a routerLink="/products">catalog</a>).</p>
+    <div class="page-header-row">
+      <div>
+        <h1>Products</h1>
+        <p class="muted">Soft-deactivated items not shown in the active catalog.</p>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" (click)="showCreateModal.set(true)">Add product</button>
+    </div>
+    <nav class="section-tabs">
+      <a routerLink="/products" routerLinkActive="tab-active" [routerLinkActiveOptions]="{ exact: true }">Active</a>
+      <a routerLink="/products/inactive" routerLinkActive="tab-active">Inactive</a>
+    </nav>
   </header>
 
   @if (loading()) {
@@ -11,6 +24,9 @@
   } @else if (products().length === 0) {
     <p class="muted">No inactive products.</p>
   } @else {
+    @if (activateError()) {
+      <div class="banner banner-error" role="alert">{{ activateError() }}</div>
+    }
     <ul class="card-grid">
       @for (p of products(); track p.id) {
         <li>
@@ -22,6 +38,14 @@
               <span class="card-meta">Deactivated {{ p.deactivated_at | date: 'medium' }}</span>
             }
             <span class="card-price">{{ p.price | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+            <div class="card-actions">
+              <button
+                type="button"
+                class="btn-activate-sm"
+                [disabled]="activating() === p.id"
+                (click)="activate(p.id, $event)"
+              >{{ activating() === p.id ? 'Activating…' : 'Activate' }}</button>
+            </div>
           </a>
         </li>
       }

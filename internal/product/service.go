@@ -78,6 +78,15 @@ func (s *Service) ListInactive(ctx context.Context, limit int64) mo.Result[[]Pro
 	return s.repo.ListInactive(ctx, limit)
 }
 
+// Activate re-activates a product by clearing deactivated_at. Idempotent.
+func (s *Service) Activate(ctx context.Context, id string) mo.Result[*Product] {
+	oid, err := parseObjectID(id)
+	if err != nil {
+		return mo.Err[*Product](err)
+	}
+	return s.repo.Activate(ctx, oid)
+}
+
 // Deactivate soft-deactivates a product. Idempotent: returns the updated document each time.
 func (s *Service) Deactivate(ctx context.Context, id string) mo.Result[*Product] {
 	oid, err := parseObjectID(id)
