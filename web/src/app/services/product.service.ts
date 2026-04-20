@@ -14,11 +14,24 @@ export class ProductService {
     return this.http.get<Product[]>(`${environment.apiBaseUrl}/products`, { params });
   }
 
+  /** Deactivated products only (newest deactivation first). */
+  listInactive(limit = 50): Observable<Product[]> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<Product[]>(`${environment.apiBaseUrl}/products/inactive`, { params });
+  }
+
   getById(id: string): Observable<Product> {
     return this.http.get<Product>(`${environment.apiBaseUrl}/products/${encodeURIComponent(id)}`);
   }
 
   create(body: CreateProductRequest): Observable<Product> {
     return this.http.post<Product>(`${environment.apiBaseUrl}/products`, body);
+  }
+
+  deactivate(id: string): Observable<Product> {
+    return this.http.post<Product>(
+      `${environment.apiBaseUrl}/products/${encodeURIComponent(id)}/deactivate`,
+      {},
+    );
   }
 }

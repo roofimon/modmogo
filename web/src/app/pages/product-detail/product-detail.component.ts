@@ -21,6 +21,8 @@ export class ProductDetailComponent {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly product = signal<Product | null>(null);
+  readonly deactivateSubmitting = signal(false);
+  readonly deactivateError = signal<string | null>(null);
 
   constructor() {
     this.route.paramMap
@@ -51,5 +53,37 @@ export class ProductDetailComponent {
           this.loading.set(false);
         },
       });
+  }
+
+  isInactive(p: Product): boolean {
+    return p.deactivated_at != null && p.deactivated_at !== '';
+  }
+
+  confirmDeactivate(): void {
+    if (!confirm('Deactivate this product? It will disappear from the catalog.')) {
+      return;
+    }
+    const p = this.product();
+    if (!p) return;
+    this.deactivateError.set(null);
+    this.deactivateSubmitting.set(true);
+    this.productsApi.deactivate(p.id).subscribe({
+      next: (updated) => {
+        this.product.set(updated);
+        this.deactivateSubmitting.set(false);
+      },
+      error: (e: unknown) => {
+        const msg =
+          e instanceof HttpErrorResponse
+            ? typeof e.error === 'string'
+              ? e.error
+              : e.message
+            : e instanceof Error
+              ? e.message
+              : 'Could not deactivate';
+        this.deactivateError.set(msg);
+        this.deactivateSubmitting.set(false);
+      },
+    });
   }
 }

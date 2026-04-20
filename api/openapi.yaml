@@ -1,0 +1,272 @@
+openapi: 3.0.3
+info:
+  title: modmono
+  description: HTTP API for the modmono Fiber service (products and health probes).
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
+    description: Local default (HTTP_ADDR)
+
+paths:
+  /products:
+    get:
+      summary: List products
+      description: Returns active (non-deactivated) products ordered by creation time descending. Default limit is 50; maximum is 100.
+      operationId: listProducts
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of products to return (1–100). Values above 100 are capped at 100.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: List of products (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "400":
+          description: Invalid limit query parameter.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid limit
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      summary: Create product
+      operationId: createProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: Product created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Invalid JSON body or validation error (e.g. empty name, negative price).
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                invalidJson:
+                  value: invalid JSON body
+                invalidName:
+                  value: product: name is required
+                invalidPrice:
+                  value: product: price must be non-negative
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /products/inactive:
+    get:
+      summary: List inactive products
+      description: Returns deactivated products only, ordered by deactivated_at descending (then creation). Same limit rules as GET /products.
+      operationId: listInactiveProducts
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of products to return (1–100). Values above 100 are capped at 100.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: List of inactive products (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "400":
+          description: Invalid limit query parameter.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid limit
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /products/{id}/deactivate:
+    post:
+      summary: Deactivate product
+      description: Soft-deactivates the product (sets deactivated_at). Idempotent; returns the updated product. Deactivated products are omitted from GET /products.
+      operationId: deactivateProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: MongoDB ObjectID as 24-character hexadecimal string.
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{24}$'
+      responses:
+        "200":
+          description: Product deactivated (or already inactive; timestamp may be refreshed).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: ID is not a valid ObjectID hex.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid product id
+        "404":
+          description: Product does not exist.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: product not found
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /products/{id}:
+    get:
+      summary: Get product by ID
+      operationId: getProductById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: MongoDB ObjectID as 24-character hexadecimal string.
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{24}$'
+      responses:
+        "200":
+          description: Product found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: ID is not a valid ObjectID hex.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: invalid product id
+        "404":
+          description: Product does not exist.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: product not found
+        "500":
+          description: Server or database error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /health/live:
+    get:
+      summary: Liveness probe
+      operationId: healthLive
+      responses:
+        "200":
+          description: Process is alive (empty body).
+
+  /health/ready:
+    get:
+      summary: Readiness probe
+      description: Verifies MongoDB connectivity with a short ping after resolving the lazy client.
+      operationId: healthReady
+      responses:
+        "200":
+          description: MongoDB is reachable.
+        "503":
+          description: Not ready (e.g. MongoDB unavailable).
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: not ready
+
+components:
+  schemas:
+    Product:
+      type: object
+      required:
+        - id
+        - sku
+        - name
+        - price
+        - created_at
+      properties:
+        id:
+          type: string
+          description: MongoDB ObjectID as hex string.
+          example: 507f1f77bcf86cd799439011
+        sku:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+          description: UTC timestamp set by the server on create.
+        deactivated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When set, the product is inactive and excluded from list.
+
+    CreateProductRequest:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+          format: double
+          minimum: 0

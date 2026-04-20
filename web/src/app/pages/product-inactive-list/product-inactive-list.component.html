@@ -1,0 +1,30 @@
+<section class="page">
+  <header class="page-header">
+    <h1>Inactive products</h1>
+    <p class="muted">Soft-deactivated items (not shown in the <a routerLink="/products">catalog</a>).</p>
+  </header>
+
+  @if (loading()) {
+    <p class="muted">Loading…</p>
+  } @else if (error()) {
+    <div class="banner banner-error" role="alert">{{ error() }}</div>
+  } @else if (products().length === 0) {
+    <p class="muted">No inactive products.</p>
+  } @else {
+    <ul class="card-grid">
+      @for (p of products(); track p.id) {
+        <li>
+          <a class="card card-inactive" [routerLink]="['/products', p.id]">
+            <span class="badge">Inactive</span>
+            <span class="card-sku">{{ p.sku }}</span>
+            <span class="card-title">{{ p.name }}</span>
+            @if (p.deactivated_at) {
+              <span class="card-meta">Deactivated {{ p.deactivated_at | date: 'medium' }}</span>
+            }
+            <span class="card-price">{{ p.price | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+          </a>
+        </li>
+      }
+    </ul>
+  }
+</section>

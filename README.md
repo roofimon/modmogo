@@ -60,7 +60,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:4200 go run ./cmd/server
 
 ## Web UI (Angular)
 
-The [`web/`](web/) app is a standalone Angular **19** SPA with a Coinbase Design System–inspired theme (SCSS tokens and Inter; not the React `@coinbase/cds-web` package). It talks to the same product API described in [`api/openapi.yaml`](api/openapi.yaml): list and detail use `GET /products` and `GET /products/{id}`; create uses `POST /products`.
+The [`web/`](web/) app is a standalone Angular **19** SPA with a Coinbase Design System–inspired theme (SCSS tokens and Inter; not the React `@coinbase/cds-web` package). It talks to the same product API described in [`api/openapi.yaml`](api/openapi.yaml): catalog uses `GET /products` (active only); inactive inventory uses `GET /products/inactive`; detail uses `GET /products/{id}`; create uses `POST /products`; soft-deactivate uses `POST /products/{id}/deactivate`. The **Inactive** nav item opens the inactive list page.
 
 From the repository root:
 

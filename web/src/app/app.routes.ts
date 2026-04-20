@@ -8,6 +8,13 @@ export const routes: Routes = [
       import('./pages/product-list/product-list.component').then((m) => m.ProductListComponent),
   },
   {
+    path: 'products/inactive',
+    loadComponent: () =>
+      import('./pages/product-inactive-list/product-inactive-list.component').then(
+        (m) => m.ProductInactiveListComponent,
+      ),
+  },
+  {
     path: 'products/new',
     loadComponent: () =>
       import('./pages/product-create/product-create.component').then((m) => m.ProductCreateComponent),

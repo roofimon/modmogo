@@ -8,6 +8,14 @@
       <div class="banner banner-error" role="alert">{{ error() }}</div>
     } @else {
       @if (product(); as p) {
+        @if (isInactive(p)) {
+          <div class="banner banner-inactive" role="status">
+            This product is <strong>inactive</strong> and no longer appears in the catalog.
+          </div>
+        }
+        @if (deactivateError()) {
+          <div class="banner banner-error" role="alert">{{ deactivateError() }}</div>
+        }
         <article class="detail-card">
           <header class="detail-header">
             <span class="sku">{{ p.sku }}</span>
@@ -22,11 +30,29 @@
               <dt>Created</dt>
               <dd>{{ p.created_at | date: 'medium' }}</dd>
             </div>
+            @if (p.deactivated_at) {
+              <div>
+                <dt>Deactivated</dt>
+                <dd>{{ p.deactivated_at | date: 'medium' }}</dd>
+              </div>
+            }
             <div>
               <dt>ID</dt>
               <dd class="mono">{{ p.id }}</dd>
             </div>
           </dl>
+          @if (!isInactive(p)) {
+            <div class="detail-actions">
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="deactivateSubmitting()"
+                (click)="confirmDeactivate()"
+              >
+                {{ deactivateSubmitting() ? 'Deactivating…' : 'Deactivate product' }}
+              </button>
+            </div>
+          }
         </article>
       }
     }
