@@ -37,6 +37,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) mo.Result[*Product
 	}
 	now := time.Now().UTC()
 	p := &Product{
+		SKU:       strings.TrimSpace(in.SKU),
 		Name:      name,
 		Price:     in.Price,
 		CreatedAt: now,
