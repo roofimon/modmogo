@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
@@ -20,9 +22,10 @@ import (
 )
 
 type config struct {
-	MongoURI string
-	MongoDB  string
-	HTTPAddr string
+	MongoURI           string
+	MongoDB            string
+	HTTPAddr           string
+	CORSAllowedOrigins string // comma-separated; empty disables CORS middleware
 }
 
 func getenv(key, def string) string {
@@ -34,10 +37,24 @@ func getenv(key, def string) string {
 
 func loadConfig() config {
 	return config{
-		MongoURI: getenv("MONGO_URI", "mongodb://localhost:27017"),
-		MongoDB:  getenv("MONGO_DB", "modmono"),
-		HTTPAddr: getenv("HTTP_ADDR", ":8080"),
+		MongoURI:           getenv("MONGO_URI", "mongodb://localhost:27017"),
+		MongoDB:            getenv("MONGO_DB", "modmono"),
+		HTTPAddr:           getenv("HTTP_ADDR", ":8080"),
+		CORSAllowedOrigins: getenv("CORS_ALLOWED_ORIGINS", ""),
 	}
+}
+
+// corsAllowOrigins returns a comma-separated list suitable for fiber cors, or "" if none configured.
+func corsAllowOrigins(csv string) string {
+	parts := strings.Split(csv, ",")
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, ",")
 }
 
 func newProductService(lazy *platformmongo.LazyClient, dbName string) *product.Service {
@@ -45,9 +62,16 @@ func newProductService(lazy *platformmongo.LazyClient, dbName string) *product.S
 	return product.NewService(repo)
 }
 
-func newFiberApp(svc *product.Service, lazy *platformmongo.LazyClient) *fiber.App {
+func newFiberApp(svc *product.Service, lazy *platformmongo.LazyClient, cfg config) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "modmono"})
 	app.Use(recover.New(), requestid.New(), logger.New())
+	if allow := corsAllowOrigins(cfg.CORSAllowedOrigins); allow != "" {
+		app.Use(cors.New(cors.Config{
+			AllowOrigins: allow,
+			AllowMethods: "GET,POST,OPTIONS,HEAD",
+			AllowHeaders: "Origin,Content-Type,Accept,Authorization,X-Requested-With",
+		}))
+	}
 	product.RegisterRoutes(app, svc)
 	health.RegisterRoutes(app, lazy)
 	return app
@@ -79,7 +103,7 @@ func run(ctx context.Context) error {
 	defer lazy.Disconnect()
 
 	svc := newProductService(lazy, cfg.MongoDB)
-	app := newFiberApp(svc, lazy)
+	app := newFiberApp(svc, lazy, cfg)
 
 	return runHTTPServer(ctx, app, cfg.HTTPAddr)
 }

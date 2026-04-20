@@ -1,0 +1,45 @@
+<section class="page">
+  <a routerLink="/products" class="back-link">← Back to catalog</a>
+
+  <header class="page-header">
+    <h1>Add product</h1>
+    <p class="muted">Creates a product via <code>POST /products</code>.</p>
+  </header>
+
+  @if (error()) {
+    <div class="banner banner-error" role="alert">{{ error() }}</div>
+  }
+
+  <form class="form-card" [formGroup]="form" (ngSubmit)="submit()">
+    <label class="field">
+      <span class="label">SKU</span>
+      <input class="input" type="text" formControlName="sku" autocomplete="off" />
+      @if (form.controls.sku.touched && form.controls.sku.invalid) {
+        <span class="field-error">SKU is required.</span>
+      }
+    </label>
+
+    <label class="field">
+      <span class="label">Name</span>
+      <input class="input" type="text" formControlName="name" autocomplete="off" />
+      @if (form.controls.name.touched && form.controls.name.invalid) {
+        <span class="field-error">Name is required.</span>
+      }
+    </label>
+
+    <label class="field">
+      <span class="label">Price (USD)</span>
+      <input class="input" type="number" formControlName="price" min="0" step="0.01" />
+      @if (form.controls.price.touched && form.controls.price.invalid) {
+        <span class="field-error">Enter a non-negative price.</span>
+      }
+    </label>
+
+    <div class="actions">
+      <button class="btn btn-primary" type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Creating…' : 'Create product' }}
+      </button>
+      <a routerLink="/products" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</section>

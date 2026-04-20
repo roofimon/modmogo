@@ -1,0 +1,34 @@
+<section class="page">
+  <a routerLink="/products" class="back-link">← Back to catalog</a>
+
+  @if (loading()) {
+    <p class="muted">Loading…</p>
+  } @else {
+    @if (error()) {
+      <div class="banner banner-error" role="alert">{{ error() }}</div>
+    } @else {
+      @if (product(); as p) {
+        <article class="detail-card">
+          <header class="detail-header">
+            <span class="sku">{{ p.sku }}</span>
+            <h1>{{ p.name }}</h1>
+          </header>
+          <dl class="detail-grid">
+            <div>
+              <dt>Price</dt>
+              <dd>{{ p.price | currency: 'USD' : 'symbol' : '1.2-2' }}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{{ p.created_at | date: 'medium' }}</dd>
+            </div>
+            <div>
+              <dt>ID</dt>
+              <dd class="mono">{{ p.id }}</dd>
+            </div>
+          </dl>
+        </article>
+      }
+    }
+  }
+</section>

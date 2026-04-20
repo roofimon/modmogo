@@ -1,0 +1,12 @@
+<div class="app-shell">
+  <header class="app-header">
+    <a routerLink="/products" class="brand">modmono</a>
+    <nav class="nav">
+      <a routerLink="/products" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Catalog</a>
+      <a routerLink="/products/new" routerLinkActive="active">Add product</a>
+    </nav>
+  </header>
+  <main class="app-main">
+    <router-outlet />
+  </main>
+</div>

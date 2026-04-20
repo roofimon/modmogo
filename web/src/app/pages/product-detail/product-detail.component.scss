@@ -1,0 +1,66 @@
+.back-link {
+  display: inline-block;
+  margin-bottom: var(--space-5);
+  font-size: var(--fontSize-caption);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.detail-card {
+  max-width: 640px;
+  padding: var(--space-6);
+  background: var(--color-bgPrimary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.detail-header .sku {
+  display: inline-block;
+  font-size: var(--fontSize-caption);
+  font-weight: 700;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+
+.detail-header h1 {
+  margin: 0;
+  font-size: var(--fontSize-title);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.detail-grid {
+  margin: var(--space-6) 0 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.detail-grid dt {
+  margin: 0;
+  font-size: var(--fontSize-caption);
+  font-weight: 600;
+  color: var(--color-fgMuted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-grid dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fontSize-body);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  font-size: 0.9em;
+  word-break: break-all;
+}

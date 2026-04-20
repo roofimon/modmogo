@@ -6,6 +6,7 @@ HTTP API service built with [Fiber](https://gofiber.io/) and MongoDB.
 
 - [Go](https://go.dev/dl/) 1.24 or newer
 - [Docker](https://docs.docker.com/get-docker/) (optional, for running MongoDB locally)
+- [Bun](https://bun.sh/) 1.2+ (for installing and running scripts in the Angular web UI in [`web/`](web/))
 
 ## Run MongoDB
 
@@ -43,12 +44,44 @@ Stop the server with `Ctrl+C` (graceful shutdown).
 | `MONGO_URI` | `mongodb://localhost:27017`    | MongoDB connection URI |
 | `MONGO_DB`  | `modmono`                       | Database name      |
 | `HTTP_ADDR` | `:8080`                         | Listen address     |
+| `CORS_ALLOWED_ORIGINS` | *(empty)*            | Comma-separated browser origins allowed for cross-origin API calls (e.g. the Angular dev server). When empty, no CORS middleware is enabled. |
 
 Example:
 
 ```bash
 HTTP_ADDR=:3000 MONGO_DB=mydb go run ./cmd/server
 ```
+
+Local SPA example (Angular on port 4200 calling the API on 8080):
+
+```bash
+CORS_ALLOWED_ORIGINS=http://localhost:4200 go run ./cmd/server
+```
+
+## Web UI (Angular)
+
+The [`web/`](web/) app is a standalone Angular **19** SPA with a Coinbase Design System–inspired theme (SCSS tokens and Inter; not the React `@coinbase/cds-web` package). It talks to the same product API described in [`api/openapi.yaml`](api/openapi.yaml): list and detail use `GET /products` and `GET /products/{id}`; create uses `POST /products`.
+
+From the repository root:
+
+```bash
+cd web
+bun install
+bun run start
+```
+
+By default `bun run start` (`ng serve`) runs at **http://localhost:4200**. Development uses relative API URLs and [`web/proxy.conf.json`](web/proxy.conf.json) to forward `/products` and `/health` to **http://localhost:8080**, so you do **not** need CORS for local UI development as long as the API is listening on 8080.
+
+If you point the SPA at the API with an absolute URL (e.g. `apiBaseUrl: 'http://localhost:8080'`) instead of the proxy, set `CORS_ALLOWED_ORIGINS` to the exact origin you use in the browser (including scheme and host, e.g. `http://localhost:4200` vs `http://127.0.0.1:4200`). A mismatch there often surfaces in Angular as **status 0** / “unknown” errors.
+
+Production builds use `src/environments/environment.ts` with `apiBaseUrl` **`''`**, so requests are same-origin relative URLs (e.g. `/products`). Point that at your API with a reverse proxy or change the value for your deployment.
+
+```bash
+cd web
+bun run build
+```
+
+Output is under `web/dist/web/`.
 
 ## Build
 
