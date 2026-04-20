@@ -11,13 +11,31 @@ const defaultListLimit int64 = 50
 const maxListLimit int64 = 100
 
 // RegisterRoutes mounts order HTTP routes on app.
-func RegisterRoutes(app *fiber.App, svc *Service) {
+func RegisterRoutes(app *fiber.App, svc *Service, catalog ProductCatalog) {
 	g := app.Group("/orders")
 	g.Post("/", handleCreate(svc))
+	g.Get("/products", handleListProducts(catalog))
 	g.Get("/", handleList(svc))
 	g.Get("/inactive", handleListInactive(svc))
 	g.Post("/:id/deactivate", handleDeactivate(svc))
 	g.Get("/:id", handleGetByID(svc))
+}
+
+func handleListProducts(catalog ProductCatalog) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		limit, err := parseListLimit(c)
+		if err != nil {
+			return err
+		}
+		products, err := catalog.ListActiveProducts(c.UserContext(), limit)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		}
+		if products == nil {
+			products = []CatalogProduct{}
+		}
+		return c.JSON(products)
+	}
 }
 
 func handleCreate(svc *Service) fiber.Handler {

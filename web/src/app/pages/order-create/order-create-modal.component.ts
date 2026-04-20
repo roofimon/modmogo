@@ -4,9 +4,8 @@ import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 
-import { Product } from '../../models/product';
+import { CatalogProduct } from '../../models/order';
 import { OrderService } from '../../services/order.service';
-import { ProductService } from '../../services/product.service';
 
 @Component({
   selector: 'app-order-create-modal',
@@ -20,14 +19,13 @@ export class OrderCreateModalComponent {
 
   private readonly fb = inject(FormBuilder);
   private readonly ordersApi = inject(OrderService);
-  private readonly productsApi = inject(ProductService);
   private readonly router = inject(Router);
 
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
-  readonly products = signal<Product[]>([]);
+  readonly products = signal<CatalogProduct[]>([]);
   readonly activeSuggestionRow = signal<number | null>(null);
-  readonly suggestions = signal<Product[]>([]);
+  readonly suggestions = signal<CatalogProduct[]>([]);
 
   readonly form = this.fb.nonNullable.group({
     customer_id: ['', Validators.pattern(/^$|^[0-9a-fA-F]{24}$/)],
@@ -35,7 +33,7 @@ export class OrderCreateModalComponent {
   });
 
   constructor() {
-    this.productsApi.list(500).subscribe({
+    this.ordersApi.listProducts().subscribe({
       next: (items) => this.products.set(items ?? []),
     });
   }
@@ -79,7 +77,7 @@ export class OrderCreateModalComponent {
     );
   }
 
-  selectSku(product: Product, i: number): void {
+  selectSku(product: CatalogProduct, i: number): void {
     const row = this.itemAt(i);
     row.controls['sku'].setValue(product.sku);
     row.controls['unit_price'].setValue(product.price);

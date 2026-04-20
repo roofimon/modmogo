@@ -17,3 +17,9 @@ export interface CreateOrderRequest {
   customer_id?: string | null;
   items: OrderItem[];
 }
+
+export interface CatalogProduct {
+  sku: string;
+  name: string;
+  price: number;
+}

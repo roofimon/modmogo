@@ -74,6 +74,24 @@ func newOrderService(lazy *platformmongo.LazyClient, dbName string) *order.Servi
 	return order.NewService(repo)
 }
 
+// productCatalogAdapter adapts product.Service to the order.ProductCatalog port.
+type productCatalogAdapter struct {
+	svc *product.Service
+}
+
+func (a *productCatalogAdapter) ListActiveProducts(ctx context.Context, limit int64) ([]order.CatalogProduct, error) {
+	res := a.svc.List(ctx, limit)
+	if res.IsError() {
+		return nil, res.Error()
+	}
+	products := res.MustGet()
+	out := make([]order.CatalogProduct, len(products))
+	for i, p := range products {
+		out[i] = order.CatalogProduct{SKU: p.SKU, Name: p.Name, Price: p.Price}
+	}
+	return out, nil
+}
+
 func newFiberApp(
 	productSvc  *product.Service,
 	customerSvc *customer.Service,
@@ -92,7 +110,7 @@ func newFiberApp(
 	}
 	product.RegisterRoutes(app, productSvc)
 	customer.RegisterRoutes(app, customerSvc)
-	order.RegisterRoutes(app, orderSvc)
+	order.RegisterRoutes(app, orderSvc, &productCatalogAdapter{svc: productSvc})
 	health.RegisterRoutes(app, lazy)
 	return app
 }

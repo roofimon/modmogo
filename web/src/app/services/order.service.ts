@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../environments/environment';
-import { CreateOrderRequest, Order } from '../models/order';
+import { CatalogProduct, CreateOrderRequest, Order } from '../models/order';
 
 @Injectable({ providedIn: 'root' })
 export class OrderService {
@@ -25,6 +25,11 @@ export class OrderService {
 
   create(body: CreateOrderRequest): Observable<Order> {
     return this.http.post<Order>(`${environment.apiBaseUrl}/orders`, body);
+  }
+
+  listProducts(limit = 100): Observable<CatalogProduct[]> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<CatalogProduct[]>(`${environment.apiBaseUrl}/orders/products`, { params });
   }
 
   deactivate(id: string): Observable<Order> {
