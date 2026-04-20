@@ -47,7 +47,7 @@
                 />
                 @if (activeSuggestionRow() === i && suggestions().length) {
                   <ul class="sku-dropdown" role="listbox">
-                    @for (p of suggestions(); track p.id) {
+                    @for (p of suggestions(); track p.sku) {
                       <li role="option" (mousedown)="selectSku(p, i)">
                         <span class="sug-sku">{{ p.sku }}</span>
                         <span class="sug-name">{{ p.name }}</span>
