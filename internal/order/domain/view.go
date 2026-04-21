@@ -1,4 +1,4 @@
-package order
+package domain
 
 import (
 	"time"
@@ -14,7 +14,7 @@ type LineItemView struct {
 	UnitPrice   float64 `json:"unit_price"`
 }
 
-// OrderView is the read model returned by GetByID, enriched with display names.
+// OrderView is the read model returned by ViewOrderDetail, enriched with display names.
 type OrderView struct {
 	ID              primitive.ObjectID  `json:"id"`
 	CustomerID      *primitive.ObjectID `json:"customer_id,omitempty"`
@@ -27,8 +27,8 @@ type OrderView struct {
 	DeactivatedAt   *time.Time          `json:"deactivated_at,omitempty"`
 }
 
-// toOrderView converts a domain Order into an enriched OrderView.
-func toOrderView(o Order, customerName string, productNames map[string]string) OrderView {
+// ToOrderView converts a domain Order into an enriched OrderView.
+func ToOrderView(o Order, customerName string, productNames map[string]string) OrderView {
 	items := make([]LineItemView, len(o.Items))
 	for i, item := range o.Items {
 		items[i] = LineItemView{

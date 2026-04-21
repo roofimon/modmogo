@@ -20,8 +20,11 @@ import (
 	customerhttp "modmono/internal/customer/adapter/http"
 	customerapplication "modmono/internal/customer/application"
 	"modmono/internal/health"
-	"modmono/internal/order"
-	"modmono/internal/order/catalog"
+	orderadapter "modmono/internal/order/adapter"
+	ordercatalog "modmono/internal/order/adapter/catalog"
+	orderhttp "modmono/internal/order/adapter/http"
+	orderapplication "modmono/internal/order/application"
+	orderport "modmono/internal/order/port"
 	platformmongo "modmono/internal/platform/mongo"
 	productadapter "modmono/internal/product/adapter"
 	producthttp "modmono/internal/product/adapter/http"
@@ -32,7 +35,7 @@ type config struct {
 	MongoURI           string
 	MongoDB            string
 	HTTPAddr           string
-	CORSAllowedOrigins string // comma-separated; empty disables CORS middleware
+	CORSAllowedOrigins string
 }
 
 func run(ctx context.Context) error {
@@ -42,8 +45,8 @@ func run(ctx context.Context) error {
 
 	productSvc      := newProductService(lazy, cfg.MongoDB)
 	customerSvc     := newCustomerService(lazy, cfg.MongoDB)
-	productCatalog  := catalog.NewProductCatalogAdapter(productSvc)
-	customerCatalog := catalog.NewCustomerCatalogAdapter(customerSvc)
+	productCatalog  := ordercatalog.NewProductCatalogAdapter(productSvc)
+	customerCatalog := ordercatalog.NewCustomerCatalogAdapter(customerSvc)
 	orderSvc        := newOrderService(lazy, cfg.MongoDB, productCatalog, customerCatalog)
 
 	app := newFiberApp(productSvc, customerSvc, orderSvc, productCatalog, customerCatalog, lazy, cfg)
@@ -94,17 +97,17 @@ func newCustomerService(lazy *platformmongo.LazyClient, dbName string) *customer
 	return customerapplication.NewService(repo)
 }
 
-func newOrderService(lazy *platformmongo.LazyClient, dbName string, products order.ProductCatalog, customers order.CustomerCatalog) *order.Service {
-	repo := order.NewMongoRepository(lazy, dbName)
-	return order.NewService(repo, products, customers)
+func newOrderService(lazy *platformmongo.LazyClient, dbName string, products orderport.ProductCatalog, customers orderport.CustomerCatalog) *orderapplication.Service {
+	repo := orderadapter.NewMongoRepository(lazy, dbName)
+	return orderapplication.NewService(repo, products, customers)
 }
 
 func newFiberApp(
 	productSvc      *productapplication.Service,
 	customerSvc     *customerapplication.Service,
-	orderSvc        *order.Service,
-	productCatalog  order.ProductCatalog,
-	customerCatalog order.CustomerCatalog,
+	orderSvc        *orderapplication.Service,
+	productCatalog  orderport.ProductCatalog,
+	customerCatalog orderport.CustomerCatalog,
 	lazy            *platformmongo.LazyClient,
 	cfg             config,
 ) *fiber.App {
@@ -119,7 +122,7 @@ func newFiberApp(
 	}
 	producthttp.RegisterRoutes(app, productSvc)
 	customerhttp.RegisterRoutes(app, customerSvc)
-	order.RegisterRoutes(app, orderSvc, productCatalog, customerCatalog)
+	orderhttp.RegisterRoutes(app, orderSvc, productCatalog, customerCatalog)
 	health.RegisterRoutes(app, lazy)
 	return app
 }

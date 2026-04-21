@@ -1,9 +1,16 @@
-package order
+package domain
 
 import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+// Status constants for Order.
+const (
+	StatusPending          = ""
+	StatusPaymentCompleted = "payment_completed"
+	StatusDeactivated      = "deactivated"
 )
 
 // LineItem is a single product line within an order.
@@ -12,13 +19,6 @@ type LineItem struct {
 	Quantity  int     `bson:"quantity"   json:"quantity"`
 	UnitPrice float64 `bson:"unit_price" json:"unit_price"`
 }
-
-// Status constants for Order.
-const (
-	StatusPending          = ""
-	StatusPaymentCompleted = "payment_completed"
-	StatusDeactivated      = "deactivated"
-)
 
 // Order is the order aggregate root persisted in MongoDB.
 type Order struct {
@@ -33,7 +33,6 @@ type Order struct {
 }
 
 // ComputeTotal sets Total = sum(quantity * unit_price) for all items.
-// Must be called after every MongoDB read before serialising to JSON.
 func (o *Order) ComputeTotal() {
 	var sum float64
 	for _, item := range o.Items {
@@ -51,6 +50,6 @@ type LineItemInput struct {
 
 // CreateInput is the JSON payload for creating an order.
 type CreateInput struct {
-	CustomerID *string         `json:"customer_id"` // optional 24-hex ObjectID string
+	CustomerID *string         `json:"customer_id"`
 	Items      []LineItemInput `json:"items"`
 }

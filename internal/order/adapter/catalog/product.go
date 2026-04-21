@@ -5,11 +5,11 @@ import (
 
 	"github.com/samber/mo"
 
-	"modmono/internal/order"
+	"modmono/internal/order/port"
 	productapplication "modmono/internal/product/application"
 )
 
-// ProductCatalogAdapter adapts product Service to the order.ProductCatalog port.
+// ProductCatalogAdapter adapts product Service to the order port.ProductCatalog.
 type ProductCatalogAdapter struct {
 	svc *productapplication.Service
 }
@@ -18,15 +18,15 @@ func NewProductCatalogAdapter(svc *productapplication.Service) *ProductCatalogAd
 	return &ProductCatalogAdapter{svc: svc}
 }
 
-func (a *ProductCatalogAdapter) ListActiveProducts(ctx context.Context, limit int64) mo.Result[[]order.CatalogProduct] {
+func (a *ProductCatalogAdapter) ListActiveProducts(ctx context.Context, limit int64) mo.Result[[]port.CatalogProduct] {
 	res := a.svc.List(ctx, limit)
 	if res.IsError() {
-		return mo.Err[[]order.CatalogProduct](res.Error())
+		return mo.Err[[]port.CatalogProduct](res.Error())
 	}
 	products := res.MustGet()
-	out := make([]order.CatalogProduct, len(products))
+	out := make([]port.CatalogProduct, len(products))
 	for i, p := range products {
-		out[i] = order.CatalogProduct{SKU: p.SKU, Name: p.Name, Price: p.Price}
+		out[i] = port.CatalogProduct{SKU: p.SKU, Name: p.Name, Price: p.Price}
 	}
 	return mo.Ok(out)
 }

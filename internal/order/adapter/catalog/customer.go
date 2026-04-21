@@ -6,10 +6,10 @@ import (
 	"github.com/samber/mo"
 
 	customerapplication "modmono/internal/customer/application"
-	"modmono/internal/order"
+	"modmono/internal/order/port"
 )
 
-// CustomerCatalogAdapter adapts customer Service to the order.CustomerCatalog port.
+// CustomerCatalogAdapter adapts customer Service to the order port.CustomerCatalog.
 type CustomerCatalogAdapter struct {
 	svc *customerapplication.Service
 }
@@ -18,15 +18,15 @@ func NewCustomerCatalogAdapter(svc *customerapplication.Service) *CustomerCatalo
 	return &CustomerCatalogAdapter{svc: svc}
 }
 
-func (a *CustomerCatalogAdapter) ListActiveCustomers(ctx context.Context, limit int64) mo.Result[[]order.CatalogCustomer] {
+func (a *CustomerCatalogAdapter) ListActiveCustomers(ctx context.Context, limit int64) mo.Result[[]port.CatalogCustomer] {
 	res := a.svc.List(ctx, limit)
 	if res.IsError() {
-		return mo.Err[[]order.CatalogCustomer](res.Error())
+		return mo.Err[[]port.CatalogCustomer](res.Error())
 	}
 	customers := res.MustGet()
-	out := make([]order.CatalogCustomer, len(customers))
+	out := make([]port.CatalogCustomer, len(customers))
 	for i, c := range customers {
-		out[i] = order.CatalogCustomer{ID: c.ID.Hex(), Name: c.Name, Phone: c.Phone}
+		out[i] = port.CatalogCustomer{ID: c.ID.Hex(), Name: c.Name, Phone: c.Phone}
 	}
 	return mo.Ok(out)
 }
