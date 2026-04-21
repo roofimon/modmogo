@@ -6,7 +6,8 @@ import (
 	"os"
 
 	platformmongo "modmono/internal/platform/mongo"
-	"modmono/internal/product"
+	productadapter "modmono/internal/product/adapter"
+	productdomain "modmono/internal/product/domain"
 )
 
 // seedRows are demo catalog items with vendor-style SKUs.
@@ -53,10 +54,10 @@ func main() {
 	lazy := platformmongo.NewLazyClient(cfg.MongoURI)
 	defer lazy.Disconnect()
 
-	repo := product.NewMongoRepository(lazy, cfg.MongoDB)
+	repo := productadapter.NewMongoRepository(lazy, cfg.MongoDB)
 
 	for i, row := range seedRows {
-		p := &product.Product{
+		p := &productdomain.Product{
 			SKU:   row.sku,
 			Name:  row.name,
 			Price: row.price,

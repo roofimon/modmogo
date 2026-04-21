@@ -6,15 +6,15 @@ import (
 	"github.com/samber/mo"
 
 	"modmono/internal/order"
-	"modmono/internal/product"
+	productapplication "modmono/internal/product/application"
 )
 
-// ProductCatalogAdapter adapts product.Service to the order.ProductCatalog port.
+// ProductCatalogAdapter adapts product Service to the order.ProductCatalog port.
 type ProductCatalogAdapter struct {
-	svc *product.Service
+	svc *productapplication.Service
 }
 
-func NewProductCatalogAdapter(svc *product.Service) *ProductCatalogAdapter {
+func NewProductCatalogAdapter(svc *productapplication.Service) *ProductCatalogAdapter {
 	return &ProductCatalogAdapter{svc: svc}
 }
 
@@ -32,7 +32,7 @@ func (a *ProductCatalogAdapter) ListActiveProducts(ctx context.Context, limit in
 }
 
 func (a *ProductCatalogAdapter) ResolveProductName(ctx context.Context, sku string) string {
-	res := a.svc.GetBySKU(ctx, sku)
+	res := a.svc.FindProductBySKU(ctx, sku)
 	if res.IsError() || res.MustGet().IsAbsent() {
 		return ""
 	}

@@ -1,11 +1,14 @@
-package product
+package httpadapter
 
 import (
 	"errors"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	"modmono/internal/product/application"
+	"modmono/internal/product/domain"
+	"modmono/internal/product/port"
 )
 
 const defaultListLimit int64 = 50
@@ -30,7 +33,7 @@ func parseLimit(raw string, defaultVal, maxVal int64) (int64, error) {
 
 // createErrorToHTTP maps domain validation errors to fiber HTTP errors.
 func createErrorToHTTP(err error) error {
-	if errors.Is(err, ErrInvalidName) || errors.Is(err, ErrInvalidPrice) {
+	if errors.Is(err, application.ErrInvalidName) || errors.Is(err, application.ErrInvalidPrice) {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 	return fiber.NewError(fiber.StatusInternalServerError, err.Error())
@@ -38,43 +41,31 @@ func createErrorToHTTP(err error) error {
 
 // idErrorToHTTP maps domain ID/lookup errors to fiber HTTP errors.
 func idErrorToHTTP(err error) error {
-	if errors.Is(err, ErrInvalidObjectID) {
+	if errors.Is(err, application.ErrInvalidObjectID) {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
 	}
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, port.ErrNotFound) {
 		return fiber.NewError(fiber.StatusNotFound, "product not found")
 	}
 	return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 }
 
-// parseObjectID converts a 24-char hex string to a MongoDB ObjectID.
-func parseObjectID(s string) (primitive.ObjectID, error) {
-	if len(s) != 24 {
-		return primitive.NilObjectID, ErrInvalidObjectID
-	}
-	id, err := primitive.ObjectIDFromHex(s)
-	if err != nil {
-		return primitive.NilObjectID, ErrInvalidObjectID
-	}
-	return id, nil
-}
-
 // --- Orchestration ---
 
 // RegisterRoutes mounts product HTTP routes on app.
-func RegisterRoutes(app *fiber.App, svc *Service) {
+func RegisterRoutes(app *fiber.App, svc port.UseCase) {
 	g := app.Group("/products")
 	g.Post("/", handleCreate(svc))
 	g.Get("/", handleList(svc))
 	g.Get("/inactive", handleListInactive(svc))
 	g.Post("/:id/deactivate", handleDeactivate(svc))
 	g.Post("/:id/activate", handleActivate(svc))
-	g.Get("/:id", handleGetByID(svc))
+	g.Get("/:id", handleViewProductDetail(svc))
 }
 
-func handleCreate(svc *Service) fiber.Handler {
+func handleCreate(svc port.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		var body CreateInput
+		var body domain.CreateInput
 		if err := c.BodyParser(&body); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, "invalid JSON body")
 		}
@@ -86,9 +77,9 @@ func handleCreate(svc *Service) fiber.Handler {
 	}
 }
 
-func handleGetByID(svc *Service) fiber.Handler {
+func handleViewProductDetail(svc port.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		res := svc.GetByID(c.UserContext(), c.Params("id"))
+		res := svc.ViewProductDetail(c.UserContext(), c.Params("id"))
 		if res.IsError() {
 			return idErrorToHTTP(res.Error())
 		}
@@ -100,7 +91,7 @@ func handleGetByID(svc *Service) fiber.Handler {
 	}
 }
 
-func handleActivate(svc *Service) fiber.Handler {
+func handleActivate(svc port.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		res := svc.Activate(c.UserContext(), c.Params("id"))
 		if res.IsError() {
@@ -110,7 +101,7 @@ func handleActivate(svc *Service) fiber.Handler {
 	}
 }
 
-func handleDeactivate(svc *Service) fiber.Handler {
+func handleDeactivate(svc port.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		res := svc.Deactivate(c.UserContext(), c.Params("id"))
 		if res.IsError() {
@@ -120,7 +111,7 @@ func handleDeactivate(svc *Service) fiber.Handler {
 	}
 }
 
-func handleList(svc *Service) fiber.Handler {
+func handleList(svc port.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		limit, err := parseLimit(c.Query("limit"), defaultListLimit, maxListLimit)
 		if err != nil {
@@ -130,11 +121,11 @@ func handleList(svc *Service) fiber.Handler {
 		if res.IsError() {
 			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		return c.JSON(res.OrElse([]Product{}))
+		return c.JSON(res.OrElse([]domain.Product{}))
 	}
 }
 
-func handleListInactive(svc *Service) fiber.Handler {
+func handleListInactive(svc port.UseCase) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		limit, err := parseLimit(c.Query("limit"), defaultListLimit, maxListLimit)
 		if err != nil {
@@ -144,6 +135,6 @@ func handleListInactive(svc *Service) fiber.Handler {
 		if res.IsError() {
 			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		return c.JSON(res.OrElse([]Product{}))
+		return c.JSON(res.OrElse([]domain.Product{}))
 	}
 }

@@ -23,7 +23,9 @@ import (
 	"modmono/internal/order"
 	"modmono/internal/order/catalog"
 	platformmongo "modmono/internal/platform/mongo"
-	"modmono/internal/product"
+	productadapter "modmono/internal/product/adapter"
+	producthttp "modmono/internal/product/adapter/http"
+	productapplication "modmono/internal/product/application"
 )
 
 type config struct {
@@ -82,9 +84,9 @@ func corsAllowOrigins(csv string) string {
 	return strings.Join(out, ",")
 }
 
-func newProductService(lazy *platformmongo.LazyClient, dbName string) *product.Service {
-	repo := product.NewMongoRepository(lazy, dbName)
-	return product.NewService(repo)
+func newProductService(lazy *platformmongo.LazyClient, dbName string) *productapplication.Service {
+	repo := productadapter.NewMongoRepository(lazy, dbName)
+	return productapplication.NewService(repo)
 }
 
 func newCustomerService(lazy *platformmongo.LazyClient, dbName string) *customerapplication.Service {
@@ -98,7 +100,7 @@ func newOrderService(lazy *platformmongo.LazyClient, dbName string, products ord
 }
 
 func newFiberApp(
-	productSvc      *product.Service,
+	productSvc      *productapplication.Service,
 	customerSvc     *customerapplication.Service,
 	orderSvc        *order.Service,
 	productCatalog  order.ProductCatalog,
@@ -115,7 +117,7 @@ func newFiberApp(
 			AllowHeaders: "Origin,Content-Type,Accept,Authorization,X-Requested-With",
 		}))
 	}
-	product.RegisterRoutes(app, productSvc)
+	producthttp.RegisterRoutes(app, productSvc)
 	customerhttp.RegisterRoutes(app, customerSvc)
 	order.RegisterRoutes(app, orderSvc, productCatalog, customerCatalog)
 	health.RegisterRoutes(app, lazy)

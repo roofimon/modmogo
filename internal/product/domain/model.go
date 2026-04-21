@@ -1,4 +1,4 @@
-package product
+package domain
 
 import (
 	"time"
@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	StatusActive     = "active"
+	StatusActive      = "active"
 	StatusDeactivated = "deactivated"
 )
 
