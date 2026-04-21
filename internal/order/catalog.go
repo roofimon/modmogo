@@ -1,6 +1,10 @@
 package order
 
-import "context"
+import (
+	"context"
+
+	"github.com/samber/mo"
+)
 
 // CatalogProduct is a minimal product view used by the order domain for SKU lookup.
 type CatalogProduct struct {
@@ -12,7 +16,7 @@ type CatalogProduct struct {
 // ProductCatalog is the port through which the order domain fetches and resolves products.
 // It is implemented outside this package to avoid import cycles.
 type ProductCatalog interface {
-	ListActiveProducts(ctx context.Context, limit int64) ([]CatalogProduct, error)
+	ListActiveProducts(ctx context.Context, limit int64) mo.Result[[]CatalogProduct]
 	// ResolveProductName returns the product's name for the given SKU, or "" if not found.
 	ResolveProductName(ctx context.Context, sku string) string
 }

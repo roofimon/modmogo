@@ -19,6 +19,7 @@ import (
 	"modmono/internal/customer"
 	"modmono/internal/health"
 	"modmono/internal/order"
+	"modmono/internal/order/catalog"
 	platformmongo "modmono/internal/platform/mongo"
 	"modmono/internal/product"
 )
@@ -29,6 +30,31 @@ type config struct {
 	HTTPAddr           string
 	CORSAllowedOrigins string // comma-separated; empty disables CORS middleware
 }
+
+func run(ctx context.Context) error {
+	cfg := loadConfig()
+	// Create a single lazy client for the app to use.
+	// It will connect on first use and disconnect when the app shuts down.
+	lazy := platformmongo.NewLazyClient(cfg.MongoURI)
+	defer lazy.Disconnect()
+	// Wired up services and handlers here, passing the lazy client and db name as needed.
+	productSvc  := newProductService(lazy, cfg.MongoDB)
+	customerSvc := newCustomerService(lazy, cfg.MongoDB)
+	productCatalog  := catalog.NewProductCatalogAdapter(productSvc)
+	customerCatalog := catalog.NewCustomerCatalogAdapter(customerSvc)
+	orderSvc    := newOrderService(lazy, cfg.MongoDB, productCatalog, customerCatalog)
+	// Create the fiber app with all routes and handlers.
+	app := newFiberApp(productSvc, customerSvc, orderSvc, productCatalog, customerCatalog, lazy, cfg)
+
+	return runHTTPServer(ctx, app, cfg.HTTPAddr)
+}
+
+func main() {
+	if err := run(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+}
+
 
 func getenv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
@@ -69,71 +95,20 @@ func newCustomerService(lazy *platformmongo.LazyClient, dbName string) *customer
 	return customer.NewService(repo)
 }
 
-func newOrderService(lazy *platformmongo.LazyClient, dbName string) *order.Service {
+func newOrderService(lazy *platformmongo.LazyClient, dbName string, products order.ProductCatalog, customers order.CustomerCatalog) *order.Service {
 	repo := order.NewMongoRepository(lazy, dbName)
-	return order.NewService(repo)
+	return order.NewService(repo, products, customers)
 }
 
-// productCatalogAdapter adapts product.Service to the order.ProductCatalog port.
-type productCatalogAdapter struct {
-	svc *product.Service
-}
-
-func (a *productCatalogAdapter) ListActiveProducts(ctx context.Context, limit int64) ([]order.CatalogProduct, error) {
-	res := a.svc.List(ctx, limit)
-	if res.IsError() {
-		return nil, res.Error()
-	}
-	products := res.MustGet()
-	out := make([]order.CatalogProduct, len(products))
-	for i, p := range products {
-		out[i] = order.CatalogProduct{SKU: p.SKU, Name: p.Name, Price: p.Price}
-	}
-	return out, nil
-}
-
-func (a *productCatalogAdapter) ResolveProductName(ctx context.Context, sku string) string {
-	opt, err := a.svc.GetBySKU(ctx, sku)
-	if err != nil || opt.IsAbsent() {
-		return ""
-	}
-	p, _ := opt.Get()
-	return p.Name
-}
-
-// customerCatalogAdapter adapts customer.Service to the order.CustomerCatalog port.
-type customerCatalogAdapter struct {
-	svc *customer.Service
-}
-
-func (a *customerCatalogAdapter) ListActiveCustomers(ctx context.Context, limit int64) ([]order.CatalogCustomer, error) {
-	res := a.svc.List(ctx, limit)
-	if res.IsError() {
-		return nil, res.Error()
-	}
-	customers := res.MustGet()
-	out := make([]order.CatalogCustomer, len(customers))
-	for i, c := range customers {
-		out[i] = order.CatalogCustomer{ID: c.ID.Hex(), Name: c.Name, Phone: c.Phone}
-	}
-	return out, nil
-}
-
-func (a *customerCatalogAdapter) ResolveCustomerName(ctx context.Context, hexID string) string {
-	opt, err := a.svc.GetByID(ctx, hexID)
-	if err != nil || opt.IsAbsent() {
-		return ""
-	}
-	c, _ := opt.Get()
-	return c.Name
-}
 
 func newFiberApp(
-	productSvc  *product.Service,
-	customerSvc *customer.Service,
-	orderSvc    *order.Service,
-	lazy        *platformmongo.LazyClient,
-	cfg         config,
+	productSvc      *product.Service,
+	customerSvc     *customer.Service,
+	orderSvc        *order.Service,
+	productCatalog  order.ProductCatalog,
+	customerCatalog order.CustomerCatalog,
+	lazy            *platformmongo.LazyClient,
+	cfg             config,
 ) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: "modmono"})
 	app.Use(recover.New(), requestid.New(), logger.New())
@@ -146,7 +121,7 @@ func newFiberApp(
 	}
 	product.RegisterRoutes(app, productSvc)
 	customer.RegisterRoutes(app, customerSvc)
-	order.RegisterRoutes(app, orderSvc, &productCatalogAdapter{svc: productSvc}, &customerCatalogAdapter{svc: customerSvc})
+	order.RegisterRoutes(app, orderSvc, productCatalog, customerCatalog)
 	health.RegisterRoutes(app, lazy)
 	return app
 }
@@ -170,24 +145,3 @@ func runHTTPServer(ctx context.Context, app *fiber.App, addr string) error {
 	return nil
 }
 
-func run(ctx context.Context) error {
-	cfg := loadConfig()
-	// Create a single lazy client for the app to use.
-	// It will connect on first use and disconnect when the app shuts down.
-	lazy := platformmongo.NewLazyClient(cfg.MongoURI)
-	defer lazy.Disconnect()
-	// Wired up services and handlers here, passing the lazy client and db name as needed.
-	productSvc  := newProductService(lazy, cfg.MongoDB)
-	customerSvc := newCustomerService(lazy, cfg.MongoDB)
-	orderSvc    := newOrderService(lazy, cfg.MongoDB)
-	// Create the fiber app with all routes and handlers.
-	app := newFiberApp(productSvc, customerSvc, orderSvc, lazy, cfg)
-
-	return runHTTPServer(ctx, app, cfg.HTTPAddr)
-}
-
-func main() {
-	if err := run(context.Background()); err != nil {
-		log.Fatal(err)
-	}
-}

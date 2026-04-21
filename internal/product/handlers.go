@@ -40,18 +40,17 @@ func handleCreate(svc *Service) fiber.Handler {
 
 func handleGetByID(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		id := c.Params("id")
-		opt, err := svc.GetByID(c.UserContext(), id)
-		if err != nil {
-			if errors.Is(err, ErrInvalidObjectID) {
+		res := svc.GetByID(c.UserContext(), c.Params("id"))
+		if res.IsError() {
+			if errors.Is(res.Error(), ErrInvalidObjectID) {
 				return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
 			}
-			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		if opt.IsAbsent() {
+		if res.MustGet().IsAbsent() {
 			return fiber.NewError(fiber.StatusNotFound, "product not found")
 		}
-		p, _ := opt.Get()
+		p, _ := res.MustGet().Get()
 		return c.JSON(p)
 	}
 }

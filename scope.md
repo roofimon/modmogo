@@ -1,11 +1,35 @@
 # Architecture
+## Architecture Patterns
+- USE Ports and Adapters pattern
+- Port - PortIn - PortOut - Interface
+- Adapter - AdapterIn - AdapterOut - Mostly Side Effect
+- Application - Orchrestration, Pure Logic Function
+- Domain - Domain Model
+
+## Coding Style
+- Function must do one thing well
+- Function can be categorized into 3 types including Pure Logic, Side Effect and Orchrestration
+- Side Effect Function is function that interact with outside world like terminal, file, database, cache, queue and etc
+- Pure Logic Function is function that do only business logic nothing to interacwith outside world. Mostly it will sit in the middle between side effects functions.
+- Orchrestration Function is function that compose both side effect and pure logic function together so it mostly focus on larger business flow.
+- Side Effect function must not return multiple value like (value, err) it must be wrapped with Result, Option or Either. 
 
 ## Back End
 - Modular Monolith — each domain lives under `internal/<domain>/`
-- Ports and Adapters pattern — handler → service → repository interface → MongoDB implementation
 - NO shared services between domains
+- Self Contain API, Repository and Model within domain 
 - `samber/mo` for Result/Option types
 - Functional style: small pure functions, side-effect functions, and orchestration functions kept separate
+
+## Repository
+- Responsible only in it own collection
+- Repository using Event Sourcing Pattens there is no update and delete
+- Update or Delete operation, it will create new record that associate with an origin record
+
+## Service
+- In case that we need to compose data from multiple collections it must be done in Service 
+- Example like Model enrichment
+
 
 ### Domains
 | Domain | Routes |

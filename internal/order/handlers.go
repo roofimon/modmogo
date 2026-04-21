@@ -21,7 +21,7 @@ func RegisterRoutes(app *fiber.App, svc *Service, catalog ProductCatalog, custom
 	g.Get("/payment-completed", handleListPaymentCompleted(svc))
 	g.Post("/:id/deactivate", handleDeactivate(svc))
 	g.Post("/:id/complete-payment", handleCompletePayment(svc))
-	g.Get("/:id", handleGetByID(svc, catalog, customers))
+	g.Get("/:id", handleGetByID(svc))
 }
 
 func handleListProducts(catalog ProductCatalog) fiber.Handler {
@@ -30,14 +30,11 @@ func handleListProducts(catalog ProductCatalog) fiber.Handler {
 		if err != nil {
 			return err
 		}
-		products, err := catalog.ListActiveProducts(c.UserContext(), limit)
-		if err != nil {
-			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		res := catalog.ListActiveProducts(c.UserContext(), limit)
+		if res.IsError() {
+			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		if products == nil {
-			products = []CatalogProduct{}
-		}
-		return c.JSON(products)
+		return c.JSON(res.OrElse([]CatalogProduct{}))
 	}
 }
 
@@ -47,14 +44,11 @@ func handleListCustomers(customers CustomerCatalog) fiber.Handler {
 		if err != nil {
 			return err
 		}
-		result, err := customers.ListActiveCustomers(c.UserContext(), limit)
-		if err != nil {
-			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		res := customers.ListActiveCustomers(c.UserContext(), limit)
+		if res.IsError() {
+			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		if result == nil {
-			result = []CatalogCustomer{}
-		}
-		return c.JSON(result)
+		return c.JSON(res.OrElse([]CatalogCustomer{}))
 	}
 }
 
@@ -79,34 +73,20 @@ func handleCreate(svc *Service) fiber.Handler {
 	}
 }
 
-func handleGetByID(svc *Service, products ProductCatalog, customers CustomerCatalog) fiber.Handler {
+func handleGetByID(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		id := c.Params("id")
-		opt, err := svc.GetByID(c.UserContext(), id)
-		if err != nil {
-			if errors.Is(err, ErrInvalidObjectID) {
+		res := svc.GetByID(c.UserContext(), c.Params("id"))
+		if res.IsError() {
+			if errors.Is(res.Error(), ErrInvalidObjectID) {
 				return fiber.NewError(fiber.StatusBadRequest, "invalid order id")
 			}
-			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		if opt.IsAbsent() {
+		if res.MustGet().IsAbsent() {
 			return fiber.NewError(fiber.StatusNotFound, "order not found")
 		}
-		o, _ := opt.Get()
-
-		customerName := ""
-		if o.CustomerID != nil {
-			customerName = customers.ResolveCustomerName(c.UserContext(), o.CustomerID.Hex())
-		}
-
-		productNames := make(map[string]string)
-		for _, item := range o.Items {
-			if _, seen := productNames[item.SKU]; !seen {
-				productNames[item.SKU] = products.ResolveProductName(c.UserContext(), item.SKU)
-			}
-		}
-
-		return c.JSON(toOrderView(o, customerName, productNames))
+		view, _ := res.MustGet().Get()
+		return c.JSON(view)
 	}
 }
 

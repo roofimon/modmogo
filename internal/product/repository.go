@@ -9,7 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	mongodriver "go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	platformmongo "modmono/internal/platform/mongo"
 )
@@ -20,8 +19,8 @@ var ErrNotFound = errors.New("product: not found")
 // Repository persists products.
 type Repository interface {
 	Create(ctx context.Context, p *Product) mo.Result[*Product]
-	GetByID(ctx context.Context, id primitive.ObjectID) (mo.Option[Product], error)
-	GetBySKU(ctx context.Context, sku string) (mo.Option[Product], error)
+	GetByID(ctx context.Context, id primitive.ObjectID) mo.Result[mo.Option[Product]]
+	GetBySKU(ctx context.Context, sku string) mo.Result[mo.Option[Product]]
 	List(ctx context.Context, limit int64) mo.Result[[]Product]
 	ListInactive(ctx context.Context, limit int64) mo.Result[[]Product]
 	Deactivate(ctx context.Context, id primitive.ObjectID, at time.Time) mo.Result[*Product]
@@ -47,6 +46,25 @@ func (r *MongoRepository) collection(ctx context.Context) (*mongodriver.Collecti
 	return client.Database(r.dbName).Collection("products"), nil
 }
 
+// currentStatePipeline returns an aggregation pipeline that filters to non-superseded records
+// with the given status, sorted newest first and capped at limit.
+func currentStatePipeline(status string, limit int64) mongodriver.Pipeline {
+	return mongodriver.Pipeline{
+		{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: "products"},
+			{Key: "localField", Value: "_id"},
+			{Key: "foreignField", Value: "original_id"},
+			{Key: "as", Value: "_successors"},
+		}}},
+		{{Key: "$match", Value: bson.M{
+			"_successors": bson.M{"$size": 0},
+			"status":      status,
+		}}},
+		{{Key: "$sort", Value: bson.D{{Key: "created_at", Value: -1}}}},
+		{{Key: "$limit", Value: limit}},
+	}
+}
+
 // Create inserts a product and returns it with server-assigned fields.
 func (r *MongoRepository) Create(ctx context.Context, p *Product) mo.Result[*Product] {
 	coll, err := r.collection(ctx)
@@ -59,6 +77,7 @@ func (r *MongoRepository) Create(ctx context.Context, p *Product) mo.Result[*Pro
 	if p.CreatedAt.IsZero() {
 		p.CreatedAt = p.ID.Timestamp()
 	}
+	p.Status = StatusActive
 	_, err = coll.InsertOne(ctx, p)
 	if err != nil {
 		return mo.Err[*Product](err)
@@ -66,41 +85,41 @@ func (r *MongoRepository) Create(ctx context.Context, p *Product) mo.Result[*Pro
 	return mo.Ok(p)
 }
 
-// GetByID returns Some(product) if found, None if missing, or an error for infrastructure failures.
-func (r *MongoRepository) GetByID(ctx context.Context, id primitive.ObjectID) (mo.Option[Product], error) {
+// GetByID returns Ok(Some(product)) if found, Ok(None) if missing, or Err for infrastructure failures.
+func (r *MongoRepository) GetByID(ctx context.Context, id primitive.ObjectID) mo.Result[mo.Option[Product]] {
 	coll, err := r.collection(ctx)
 	if err != nil {
-		return mo.None[Product](), err
+		return mo.Err[mo.Option[Product]](err)
 	}
 	var out Product
 	err = coll.FindOne(ctx, bson.M{"_id": id}).Decode(&out)
 	if err != nil {
 		if err == mongodriver.ErrNoDocuments {
-			return mo.None[Product](), nil
+			return mo.Ok(mo.None[Product]())
 		}
-		return mo.None[Product](), err
+		return mo.Err[mo.Option[Product]](err)
 	}
-	return mo.Some(out), nil
+	return mo.Ok(mo.Some(out))
 }
 
-// GetBySKU returns Some(product) if found by SKU, None if missing.
-func (r *MongoRepository) GetBySKU(ctx context.Context, sku string) (mo.Option[Product], error) {
+// GetBySKU returns Ok(Some(product)) if found by SKU, Ok(None) if missing, or Err for infrastructure failures.
+func (r *MongoRepository) GetBySKU(ctx context.Context, sku string) mo.Result[mo.Option[Product]] {
 	coll, err := r.collection(ctx)
 	if err != nil {
-		return mo.None[Product](), err
+		return mo.Err[mo.Option[Product]](err)
 	}
 	var out Product
-	err = coll.FindOne(ctx, bson.M{"sku": sku}).Decode(&out)
+	err = coll.FindOne(ctx, bson.M{"sku": sku, "status": StatusActive}).Decode(&out)
 	if err != nil {
 		if err == mongodriver.ErrNoDocuments {
-			return mo.None[Product](), nil
+			return mo.Ok(mo.None[Product]())
 		}
-		return mo.None[Product](), err
+		return mo.Err[mo.Option[Product]](err)
 	}
-	return mo.Some(out), nil
+	return mo.Ok(mo.Some(out))
 }
 
-// List returns up to limit products, newest first.
+// List returns up to limit active (non-superseded) products, newest first.
 func (r *MongoRepository) List(ctx context.Context, limit int64) mo.Result[[]Product] {
 	coll, err := r.collection(ctx)
 	if err != nil {
@@ -109,32 +128,14 @@ func (r *MongoRepository) List(ctx context.Context, limit int64) mo.Result[[]Pro
 	if limit <= 0 {
 		limit = 50
 	}
-	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}).SetLimit(limit)
-	activeOnly := bson.M{"$or": []bson.M{
-		{"deactivated_at": bson.M{"$exists": false}},
-		{"deactivated_at": nil},
-	}}
-	cur, err := coll.Find(ctx, activeOnly, opts)
+	cur, err := coll.Aggregate(ctx, currentStatePipeline(StatusActive, limit))
 	if err != nil {
 		return mo.Err[[]Product](err)
 	}
-	defer cur.Close(ctx)
-
-	var items []Product
-	for cur.Next(ctx) {
-		var p Product
-		if err := cur.Decode(&p); err != nil {
-			return mo.Err[[]Product](err)
-		}
-		items = append(items, p)
-	}
-	if err := cur.Err(); err != nil {
-		return mo.Err[[]Product](err)
-	}
-	return mo.Ok(items)
+	return decodeProducts(ctx, cur)
 }
 
-// ListInactive returns up to limit deactivated products, newest deactivation first (by deactivated_at desc, then created_at).
+// ListInactive returns up to limit deactivated (non-superseded) products, newest first.
 func (r *MongoRepository) ListInactive(ctx context.Context, limit int64) mo.Result[[]Product] {
 	coll, err := r.collection(ctx)
 	if err != nil {
@@ -143,14 +144,73 @@ func (r *MongoRepository) ListInactive(ctx context.Context, limit int64) mo.Resu
 	if limit <= 0 {
 		limit = 50
 	}
-	inactive := bson.M{"deactivated_at": bson.M{"$exists": true, "$ne": nil}}
-	opts := options.Find().SetSort(bson.D{{Key: "deactivated_at", Value: -1}}).SetLimit(limit)
-	cur, err := coll.Find(ctx, inactive, opts)
+	cur, err := coll.Aggregate(ctx, currentStatePipeline(StatusDeactivated, limit))
 	if err != nil {
 		return mo.Err[[]Product](err)
 	}
-	defer cur.Close(ctx)
+	return decodeProducts(ctx, cur)
+}
 
+// Deactivate creates a new deactivated record linked to the original. No records are mutated.
+func (r *MongoRepository) Deactivate(ctx context.Context, id primitive.ObjectID, at time.Time) mo.Result[*Product] {
+	coll, err := r.collection(ctx)
+	if err != nil {
+		return mo.Err[*Product](err)
+	}
+	var orig Product
+	if err := coll.FindOne(ctx, bson.M{"_id": id}).Decode(&orig); err != nil {
+		if err == mongodriver.ErrNoDocuments {
+			return mo.Err[*Product](ErrNotFound)
+		}
+		return mo.Err[*Product](err)
+	}
+	next := &Product{
+		ID:            primitive.NewObjectID(),
+		SKU:           orig.SKU,
+		Name:          orig.Name,
+		Price:         orig.Price,
+		Status:        StatusDeactivated,
+		OriginalID:    &orig.ID,
+		CreatedAt:     orig.CreatedAt,
+		DeactivatedAt: &at,
+	}
+	if _, err := coll.InsertOne(ctx, next); err != nil {
+		return mo.Err[*Product](err)
+	}
+	return mo.Ok(next)
+}
+
+// Activate creates a new active record linked to the original. No records are mutated.
+func (r *MongoRepository) Activate(ctx context.Context, id primitive.ObjectID) mo.Result[*Product] {
+	coll, err := r.collection(ctx)
+	if err != nil {
+		return mo.Err[*Product](err)
+	}
+	var orig Product
+	if err := coll.FindOne(ctx, bson.M{"_id": id}).Decode(&orig); err != nil {
+		if err == mongodriver.ErrNoDocuments {
+			return mo.Err[*Product](ErrNotFound)
+		}
+		return mo.Err[*Product](err)
+	}
+	next := &Product{
+		ID:         primitive.NewObjectID(),
+		SKU:        orig.SKU,
+		Name:       orig.Name,
+		Price:      orig.Price,
+		Status:     StatusActive,
+		OriginalID: &orig.ID,
+		CreatedAt:  orig.CreatedAt,
+	}
+	if _, err := coll.InsertOne(ctx, next); err != nil {
+		return mo.Err[*Product](err)
+	}
+	return mo.Ok(next)
+}
+
+// decodeProducts drains a cursor into a slice of Products.
+func decodeProducts(ctx context.Context, cur *mongodriver.Cursor) mo.Result[[]Product] {
+	defer cur.Close(ctx)
 	var items []Product
 	for cur.Next(ctx) {
 		var p Product
@@ -165,46 +225,3 @@ func (r *MongoRepository) ListInactive(ctx context.Context, limit int64) mo.Resu
 	return mo.Ok(items)
 }
 
-// Activate clears deactivated_at, restoring the product to the active catalog. Idempotent.
-func (r *MongoRepository) Activate(ctx context.Context, id primitive.ObjectID) mo.Result[*Product] {
-	coll, err := r.collection(ctx)
-	if err != nil {
-		return mo.Err[*Product](err)
-	}
-	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-	var out Product
-	err = coll.FindOneAndUpdate(ctx,
-		bson.M{"_id": id},
-		bson.M{"$unset": bson.M{"deactivated_at": ""}},
-		opts,
-	).Decode(&out)
-	if err != nil {
-		if err == mongodriver.ErrNoDocuments {
-			return mo.Err[*Product](ErrNotFound)
-		}
-		return mo.Err[*Product](err)
-	}
-	return mo.Ok(&out)
-}
-
-// Deactivate sets deactivated_at and returns the updated document. Idempotent: repeated calls refresh the timestamp.
-func (r *MongoRepository) Deactivate(ctx context.Context, id primitive.ObjectID, at time.Time) mo.Result[*Product] {
-	coll, err := r.collection(ctx)
-	if err != nil {
-		return mo.Err[*Product](err)
-	}
-	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-	var out Product
-	err = coll.FindOneAndUpdate(ctx,
-		bson.M{"_id": id},
-		bson.M{"$set": bson.M{"deactivated_at": at}},
-		opts,
-	).Decode(&out)
-	if err != nil {
-		if err == mongodriver.ErrNoDocuments {
-			return mo.Err[*Product](ErrNotFound)
-		}
-		return mo.Err[*Product](err)
-	}
-	return mo.Ok(&out)
-}

@@ -17,6 +17,7 @@ type LineItem struct {
 const (
 	StatusPending          = ""
 	StatusPaymentCompleted = "payment_completed"
+	StatusDeactivated      = "deactivated"
 )
 
 // Order is the order aggregate root persisted in MongoDB.

@@ -75,26 +75,21 @@ func handleCreate(svc *Service) fiber.Handler {
 
 func handleGetByID(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		id, err := parseObjectID(c.Params("id"))
-		if err != nil {
-			return fiber.NewError(fiber.StatusBadRequest, "invalid customer id")
+		res := svc.GetByID(c.UserContext(), c.Params("id"))
+		if res.IsError() {
+			return idErrorToHTTP(res.Error())
 		}
-		mayBe := svc.GetByID(c.UserContext(), id.String())
-		if mayBe.IsAbsent() {
+		if res.MustGet().IsAbsent() {
 			return fiber.NewError(fiber.StatusNotFound, "customer not found")
-		}else{
-			return c.JSON(mayBe.MustGet())
 		}
+		cust, _ := res.MustGet().Get()
+		return c.JSON(cust)
 	}
 }
 
 func handleDeactivate(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		id, err := parseObjectID(c.Params("id"))
-		if err != nil {
-			return fiber.NewError(fiber.StatusBadRequest, "invalid customer id")
-		}
-		res := svc.Deactivate(c.UserContext(), id.String())
+		res := svc.Deactivate(c.UserContext(), c.Params("id"))
 		if res.IsError() {
 			return idErrorToHTTP(res.Error())
 		}

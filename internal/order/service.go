@@ -23,12 +23,14 @@ var (
 
 // Service coordinates order use cases.
 type Service struct {
-	repo Repository
+	repo      Repository
+	products  ProductCatalog
+	customers CustomerCatalog
 }
 
 // NewService constructs an order service.
-func NewService(r Repository) *Service {
-	return &Service{repo: r}
+func NewService(r Repository, products ProductCatalog, customers CustomerCatalog) *Service {
+	return &Service{repo: r, products: products, customers: customers}
 }
 
 // Create validates input and persists a new order.
@@ -68,13 +70,36 @@ func (s *Service) Create(ctx context.Context, in CreateInput) mo.Result[*Order] 
 	return s.repo.Create(ctx, o)
 }
 
-// GetByID loads an order by its hex ID string.
-func (s *Service) GetByID(ctx context.Context, id string) (mo.Option[Order], error) {
+// GetByID loads an order by its hex ID and enriches it with customer and product names.
+func (s *Service) GetByID(ctx context.Context, id string) mo.Result[mo.Option[OrderView]] {
 	oid, err := parseObjectID(id)
 	if err != nil {
-		return mo.None[Order](), err
+		return mo.Err[mo.Option[OrderView]](err)
 	}
-	return s.repo.GetByID(ctx, oid)
+	res := s.repo.GetByID(ctx, oid)
+	if res.IsError() {
+		return mo.Err[mo.Option[OrderView]](res.Error())
+	}
+	if res.MustGet().IsAbsent() {
+		return mo.Ok(mo.None[OrderView]())
+	}
+	o, _ := res.MustGet().Get()
+	return mo.Ok(mo.Some(s.enrichOrder(ctx, o)))
+}
+
+// enrichOrder resolves customer and product names and builds an OrderView.
+func (s *Service) enrichOrder(ctx context.Context, o Order) OrderView {
+	customerName := ""
+	if o.CustomerID != nil {
+		customerName = s.customers.ResolveCustomerName(ctx, o.CustomerID.Hex())
+	}
+	productNames := make(map[string]string)
+	for _, item := range o.Items {
+		if _, seen := productNames[item.SKU]; !seen {
+			productNames[item.SKU] = s.products.ResolveProductName(ctx, item.SKU)
+		}
+	}
+	return toOrderView(o, customerName, productNames)
 }
 
 // List returns active orders ordered by creation time descending.
@@ -107,10 +132,11 @@ func (s *Service) CompletePayment(ctx context.Context, id string) mo.Result[*Ord
 	if err != nil {
 		return mo.Err[*Order](err)
 	}
-	opt, err := s.repo.GetByID(ctx, oid)
-	if err != nil {
-		return mo.Err[*Order](err)
+	res := s.repo.GetByID(ctx, oid)
+	if res.IsError() {
+		return mo.Err[*Order](res.Error())
 	}
+	opt := res.MustGet()
 	if opt.IsAbsent() {
 		return mo.Err[*Order](ErrNotFound)
 	}

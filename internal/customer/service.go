@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/samber/mo"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Domain errors for mapping to HTTP 400.
@@ -43,17 +42,6 @@ func buildCustomer(name, email, phone string, now time.Time) *Customer {
 	}
 }
 
-// // parseObjectID converts a 24-char hex string to a MongoDB ObjectID.
-// func parseObjectID(s string) (primitive.ObjectID, error) {
-// 	if len(s) != 24 {
-// 		return primitive.NilObjectID, ErrInvalidObjectID
-// 	}
-// 	id, err := primitive.ObjectIDFromHex(s)
-// 	if err != nil {
-// 		return primitive.NilObjectID, ErrInvalidObjectID
-// 	}
-// 	return id, nil
-// }
 
 // --- Orchestration ---
 
@@ -78,8 +66,11 @@ func (s *Service) Create(ctx context.Context, in CreateInput) mo.Result[*Custome
 }
 
 // GetByID loads a customer by its hex ID string.
-func (s *Service) GetByID(ctx context.Context, id string) mo.Option[Customer] {
-	oid, _ := primitive.ObjectIDFromHex(id)
+func (s *Service) GetByID(ctx context.Context, id string) mo.Result[mo.Option[Customer]] {
+	oid, err := parseObjectID(id)
+	if err != nil {
+		return mo.Err[mo.Option[Customer]](err)
+	}
 	return s.repo.GetByID(ctx, oid)
 }
 

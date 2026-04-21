@@ -49,10 +49,10 @@ func (s *Service) Create(ctx context.Context, in CreateInput) mo.Result[*Product
 var ErrInvalidObjectID = errors.New("product: invalid object id")
 
 // GetByID loads a product by identifier.
-func (s *Service) GetByID(ctx context.Context, id string) (mo.Option[Product], error) {
+func (s *Service) GetByID(ctx context.Context, id string) mo.Result[mo.Option[Product]] {
 	oid, err := parseObjectID(id)
 	if err != nil {
-		return mo.None[Product](), err
+		return mo.Err[mo.Option[Product]](err)
 	}
 	return s.repo.GetByID(ctx, oid)
 }
@@ -69,7 +69,7 @@ func parseObjectID(s string) (primitive.ObjectID, error) {
 }
 
 // GetBySKU loads a product by its SKU string.
-func (s *Service) GetBySKU(ctx context.Context, sku string) (mo.Option[Product], error) {
+func (s *Service) GetBySKU(ctx context.Context, sku string) mo.Result[mo.Option[Product]] {
 	return s.repo.GetBySKU(ctx, sku)
 }
 
