@@ -52,6 +52,8 @@ type Service struct {
 	repo port.Repository
 }
 
+var _ port.UseCase = (*Service)(nil)
+
 // NewService constructs a customer service.
 func NewService(r port.Repository) *Service {
 	return &Service{repo: r}
@@ -67,8 +69,8 @@ func (s *Service) Create(ctx context.Context, in domain.CreateInput) mo.Result[*
 	return s.repo.Create(ctx, c)
 }
 
-// GetByID loads a customer by its hex ID string.
-func (s *Service) GetByID(ctx context.Context, id string) mo.Result[mo.Option[domain.Customer]] {
+// ViewCustomerDetail loads a customer by its hex ID string.
+func (s *Service) ViewCustomerDetail(ctx context.Context, id string) mo.Result[mo.Option[domain.Customer]] {
 	oid, err := parseObjectID(id)
 	if err != nil {
 		return mo.Err[mo.Option[domain.Customer]](err)

@@ -6,11 +6,31 @@
 - Application - Orchrestration, Pure Logic Function
 - Domain - Domain Model
 
+## Architecture Rule
+- Port defines contracts, not frameworks
+- Application implements use case contracts
+- Adapters implement transport and infrastructure details
+- HTTP handler functions should not be defined as port interfaces
+- Handler dependencies should be use case interfaces, not concrete service structs
+
 ## Folder Structure
-- Port/In Port/Out
-- Adapter/In Adapter/Out
-- Domain
-- Application
+```
+internal/<domain>/
+├── domain/          — Domain models and constants
+├── port/            — PortIn (UseCase) and PortOut (Repository) interfaces
+├── adapter/
+│   ├── *.go         — Infrastructure adapters (e.g. mongo_repository.go)
+│   └── http/        — Transport adapter (HTTP handlers), package httpadapter
+└── application/     — Service (Orchestration + Pure Logic)
+```
+
+## Design Decisions
+- `port/` holds both PortIn (`UseCase`) and PortOut (`Repository`) in one file
+- UseCase methods are named after use cases, not CRUD — e.g. `ViewCustomerDetail` not `GetByID`
+- `var _ port.UseCase = (*Service)(nil)` compile-time check that Service satisfies UseCase
+- HTTP handlers live in `adapter/http/` as `package httpadapter`; depend on `port.UseCase`, never on concrete `*Service`
+- `parseObjectID` and similar infrastructure helpers live in `application/` as Pure Logic (no I/O)
+- Validation errors (`ErrInvalidName`, `ErrInvalidEmail`, `ErrInvalidObjectID`) defined in `application/`; error-to-HTTP mapping in `adapter/http/`
 
 ## Coding Style
 - Function must do one thing well

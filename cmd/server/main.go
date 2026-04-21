@@ -17,6 +17,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 
 	customeradapter "modmono/internal/customer/adapter"
+	customerhttp "modmono/internal/customer/adapter/http"
 	customerapplication "modmono/internal/customer/application"
 	"modmono/internal/health"
 	"modmono/internal/order"
@@ -115,7 +116,7 @@ func newFiberApp(
 		}))
 	}
 	product.RegisterRoutes(app, productSvc)
-	customerapplication.RegisterRoutes(app, customerSvc)
+	customerhttp.RegisterRoutes(app, customerSvc)
 	order.RegisterRoutes(app, orderSvc, productCatalog, customerCatalog)
 	health.RegisterRoutes(app, lazy)
 	return app

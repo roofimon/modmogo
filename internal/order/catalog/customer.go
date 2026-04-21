@@ -32,7 +32,7 @@ func (a *CustomerCatalogAdapter) ListActiveCustomers(ctx context.Context, limit 
 }
 
 func (a *CustomerCatalogAdapter) ResolveCustomerName(ctx context.Context, hexID string) string {
-	res := a.svc.GetByID(ctx, hexID)
+	res := a.svc.ViewCustomerDetail(ctx, hexID)
 	if res.IsError() || res.MustGet().IsAbsent() {
 		return ""
 	}

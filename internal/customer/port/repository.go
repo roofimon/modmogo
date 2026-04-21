@@ -22,3 +22,12 @@ type Repository interface {
 	ListInactive(ctx context.Context, limit int64) mo.Result[[]domain.Customer]
 	Deactivate(ctx context.Context, id primitive.ObjectID, at time.Time) mo.Result[*domain.Customer]
 }
+
+// UseCase is the inbound port consumed by transport adapters.
+type UseCase interface {
+	Create(ctx context.Context, in domain.CreateInput) mo.Result[*domain.Customer]
+	ViewCustomerDetail(ctx context.Context, id string) mo.Result[mo.Option[domain.Customer]]
+	List(ctx context.Context, limit int64) mo.Result[[]domain.Customer]
+	ListInactive(ctx context.Context, limit int64) mo.Result[[]domain.Customer]
+	Deactivate(ctx context.Context, id string) mo.Result[*domain.Customer]
+}
