@@ -5,10 +5,61 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const defaultListLimit int64 = 50
 const maxListLimit int64 = 100
+
+// --- Pure Logic ---
+
+// parseLimit parses a raw query string into a clamped list limit.
+func parseLimit(raw string, defaultVal, maxVal int64) (int64, error) {
+	if raw == "" {
+		return defaultVal, nil
+	}
+	n, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || n < 1 {
+		return 0, fiber.NewError(fiber.StatusBadRequest, "invalid limit")
+	}
+	if n > maxVal {
+		n = maxVal
+	}
+	return n, nil
+}
+
+// createErrorToHTTP maps domain validation errors to fiber HTTP errors.
+func createErrorToHTTP(err error) error {
+	if errors.Is(err, ErrInvalidName) || errors.Is(err, ErrInvalidPrice) {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+}
+
+// idErrorToHTTP maps domain ID/lookup errors to fiber HTTP errors.
+func idErrorToHTTP(err error) error {
+	if errors.Is(err, ErrInvalidObjectID) {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
+	}
+	if errors.Is(err, ErrNotFound) {
+		return fiber.NewError(fiber.StatusNotFound, "product not found")
+	}
+	return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+}
+
+// parseObjectID converts a 24-char hex string to a MongoDB ObjectID.
+func parseObjectID(s string) (primitive.ObjectID, error) {
+	if len(s) != 24 {
+		return primitive.NilObjectID, ErrInvalidObjectID
+	}
+	id, err := primitive.ObjectIDFromHex(s)
+	if err != nil {
+		return primitive.NilObjectID, ErrInvalidObjectID
+	}
+	return id, nil
+}
+
+// --- Orchestration ---
 
 // RegisterRoutes mounts product HTTP routes on app.
 func RegisterRoutes(app *fiber.App, svc *Service) {
@@ -29,10 +80,7 @@ func handleCreate(svc *Service) fiber.Handler {
 		}
 		res := svc.Create(c.UserContext(), body)
 		if res.IsError() {
-			if errors.Is(res.Error(), ErrInvalidName) || errors.Is(res.Error(), ErrInvalidPrice) {
-				return fiber.NewError(fiber.StatusBadRequest, res.Error().Error())
-			}
-			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
+			return createErrorToHTTP(res.Error())
 		}
 		return c.Status(fiber.StatusCreated).JSON(res.MustGet())
 	}
@@ -42,10 +90,7 @@ func handleGetByID(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		res := svc.GetByID(c.UserContext(), c.Params("id"))
 		if res.IsError() {
-			if errors.Is(res.Error(), ErrInvalidObjectID) {
-				return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
-			}
-			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
+			return idErrorToHTTP(res.Error())
 		}
 		if res.MustGet().IsAbsent() {
 			return fiber.NewError(fiber.StatusNotFound, "product not found")
@@ -57,16 +102,9 @@ func handleGetByID(svc *Service) fiber.Handler {
 
 func handleActivate(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		id := c.Params("id")
-		res := svc.Activate(c.UserContext(), id)
+		res := svc.Activate(c.UserContext(), c.Params("id"))
 		if res.IsError() {
-			if errors.Is(res.Error(), ErrInvalidObjectID) {
-				return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
-			}
-			if errors.Is(res.Error(), ErrNotFound) {
-				return fiber.NewError(fiber.StatusNotFound, "product not found")
-			}
-			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
+			return idErrorToHTTP(res.Error())
 		}
 		return c.JSON(res.MustGet())
 	}
@@ -74,39 +112,17 @@ func handleActivate(svc *Service) fiber.Handler {
 
 func handleDeactivate(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		id := c.Params("id")
-		res := svc.Deactivate(c.UserContext(), id)
+		res := svc.Deactivate(c.UserContext(), c.Params("id"))
 		if res.IsError() {
-			if errors.Is(res.Error(), ErrInvalidObjectID) {
-				return fiber.NewError(fiber.StatusBadRequest, "invalid product id")
-			}
-			if errors.Is(res.Error(), ErrNotFound) {
-				return fiber.NewError(fiber.StatusNotFound, "product not found")
-			}
-			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
+			return idErrorToHTTP(res.Error())
 		}
 		return c.JSON(res.MustGet())
 	}
 }
 
-func parseListLimit(c *fiber.Ctx) (int64, error) {
-	limit := defaultListLimit
-	if raw := c.Query("limit"); raw != "" {
-		n, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || n < 1 {
-			return 0, fiber.NewError(fiber.StatusBadRequest, "invalid limit")
-		}
-		if n > maxListLimit {
-			n = maxListLimit
-		}
-		limit = n
-	}
-	return limit, nil
-}
-
 func handleList(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		limit, err := parseListLimit(c)
+		limit, err := parseLimit(c.Query("limit"), defaultListLimit, maxListLimit)
 		if err != nil {
 			return err
 		}
@@ -114,17 +130,13 @@ func handleList(svc *Service) fiber.Handler {
 		if res.IsError() {
 			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		items := res.MustGet()
-		if items == nil {
-			items = []Product{}
-		}
-		return c.JSON(items)
+		return c.JSON(res.OrElse([]Product{}))
 	}
 }
 
 func handleListInactive(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		limit, err := parseListLimit(c)
+		limit, err := parseLimit(c.Query("limit"), defaultListLimit, maxListLimit)
 		if err != nil {
 			return err
 		}
@@ -132,10 +144,6 @@ func handleListInactive(svc *Service) fiber.Handler {
 		if res.IsError() {
 			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		items := res.MustGet()
-		if items == nil {
-			items = []Product{}
-		}
-		return c.JSON(items)
+		return c.JSON(res.OrElse([]Product{}))
 	}
 }

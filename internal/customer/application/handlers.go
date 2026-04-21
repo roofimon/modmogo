@@ -1,4 +1,4 @@
-package customer
+package application
 
 import (
 	"errors"
@@ -6,6 +6,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	"modmono/internal/customer/domain"
+	"modmono/internal/customer/port"
 )
 
 const defaultListLimit int64 = 50
@@ -41,10 +44,22 @@ func idErrorToHTTP(err error) error {
 	if errors.Is(err, ErrInvalidObjectID) {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid customer id")
 	}
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, port.ErrNotFound) {
 		return fiber.NewError(fiber.StatusNotFound, "customer not found")
 	}
 	return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+}
+
+// parseObjectID converts a 24-char hex string to a MongoDB ObjectID.
+func parseObjectID(s string) (primitive.ObjectID, error) {
+	if len(s) != 24 {
+		return primitive.NilObjectID, ErrInvalidObjectID
+	}
+	id, err := primitive.ObjectIDFromHex(s)
+	if err != nil {
+		return primitive.NilObjectID, ErrInvalidObjectID
+	}
+	return id, nil
 }
 
 // --- Orchestration ---
@@ -61,7 +76,7 @@ func RegisterRoutes(app *fiber.App, svc *Service) {
 
 func handleCreate(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		var body CreateInput
+		var body domain.CreateInput
 		if err := c.BodyParser(&body); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, "invalid JSON body")
 		}
@@ -107,8 +122,7 @@ func handleList(svc *Service) fiber.Handler {
 		if res.IsError() {
 			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		items := res.OrElse([]Customer{})
-		return c.JSON(items)
+		return c.JSON(res.OrElse([]domain.Customer{}))
 	}
 }
 
@@ -122,20 +136,6 @@ func handleListInactive(svc *Service) fiber.Handler {
 		if res.IsError() {
 			return fiber.NewError(fiber.StatusInternalServerError, res.Error().Error())
 		}
-		items := res.OrElse([]Customer{})
-		return c.JSON(items)
+		return c.JSON(res.OrElse([]domain.Customer{}))
 	}
-}
-
-
-// parseObjectID converts a 24-char hex string to a MongoDB ObjectID.
-func parseObjectID(s string) (primitive.ObjectID, error) {
-	if len(s) != 24 {
-		return primitive.NilObjectID, ErrInvalidObjectID
-	}
-	id, err := primitive.ObjectIDFromHex(s)
-	if err != nil {
-		return primitive.NilObjectID, ErrInvalidObjectID
-	}
-	return id, nil
 }

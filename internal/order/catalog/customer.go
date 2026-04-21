@@ -5,16 +5,16 @@ import (
 
 	"github.com/samber/mo"
 
-	"modmono/internal/customer"
+	customerapplication "modmono/internal/customer/application"
 	"modmono/internal/order"
 )
 
-// CustomerCatalogAdapter adapts customer.Service to the order.CustomerCatalog port.
+// CustomerCatalogAdapter adapts customer Service to the order.CustomerCatalog port.
 type CustomerCatalogAdapter struct {
-	svc *customer.Service
+	svc *customerapplication.Service
 }
 
-func NewCustomerCatalogAdapter(svc *customer.Service) *CustomerCatalogAdapter {
+func NewCustomerCatalogAdapter(svc *customerapplication.Service) *CustomerCatalogAdapter {
 	return &CustomerCatalogAdapter{svc: svc}
 }
 

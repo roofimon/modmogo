@@ -6,6 +6,12 @@
 - Application - Orchrestration, Pure Logic Function
 - Domain - Domain Model
 
+## Folder Structure
+- Port/In Port/Out
+- Adapter/In Adapter/Out
+- Domain
+- Application
+
 ## Coding Style
 - Function must do one thing well
 - Function can be categorized into 3 types including Pure Logic, Side Effect and Orchrestration

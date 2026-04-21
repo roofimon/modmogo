@@ -1,4 +1,4 @@
-package customer
+package application
 
 import (
 	"context"
@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/samber/mo"
+
+	"modmono/internal/customer/domain"
+	"modmono/internal/customer/port"
 )
 
 // Domain errors for mapping to HTTP 400.
@@ -19,7 +22,7 @@ var (
 // --- Pure Logic ---
 
 // validateCreateInput trims and validates a CreateInput, returning sanitised fields.
-func validateCreateInput(in CreateInput) (name, email, phone string, err error) {
+func validateCreateInput(in domain.CreateInput) (name, email, phone string, err error) {
 	name = strings.TrimSpace(in.Name)
 	if name == "" {
 		return "", "", "", ErrInvalidName
@@ -33,8 +36,8 @@ func validateCreateInput(in CreateInput) (name, email, phone string, err error) 
 }
 
 // buildCustomer constructs a Customer value from validated fields.
-func buildCustomer(name, email, phone string, now time.Time) *Customer {
-	return &Customer{
+func buildCustomer(name, email, phone string, now time.Time) *domain.Customer {
+	return &domain.Customer{
 		Name:      name,
 		Email:     email,
 		Phone:     phone,
@@ -42,53 +45,52 @@ func buildCustomer(name, email, phone string, now time.Time) *Customer {
 	}
 }
 
-
 // --- Orchestration ---
 
 // Service coordinates customer use cases.
 type Service struct {
-	repo Repository
+	repo port.Repository
 }
 
 // NewService constructs a customer service.
-func NewService(r Repository) *Service {
+func NewService(r port.Repository) *Service {
 	return &Service{repo: r}
 }
 
 // Create validates input, builds the domain object, and persists it.
-func (s *Service) Create(ctx context.Context, in CreateInput) mo.Result[*Customer] {
+func (s *Service) Create(ctx context.Context, in domain.CreateInput) mo.Result[*domain.Customer] {
 	name, email, phone, err := validateCreateInput(in)
 	if err != nil {
-		return mo.Err[*Customer](err)
+		return mo.Err[*domain.Customer](err)
 	}
 	c := buildCustomer(name, email, phone, time.Now().UTC())
 	return s.repo.Create(ctx, c)
 }
 
 // GetByID loads a customer by its hex ID string.
-func (s *Service) GetByID(ctx context.Context, id string) mo.Result[mo.Option[Customer]] {
+func (s *Service) GetByID(ctx context.Context, id string) mo.Result[mo.Option[domain.Customer]] {
 	oid, err := parseObjectID(id)
 	if err != nil {
-		return mo.Err[mo.Option[Customer]](err)
+		return mo.Err[mo.Option[domain.Customer]](err)
 	}
 	return s.repo.GetByID(ctx, oid)
 }
 
 // List returns active customers ordered by creation time descending.
-func (s *Service) List(ctx context.Context, limit int64) mo.Result[[]Customer] {
+func (s *Service) List(ctx context.Context, limit int64) mo.Result[[]domain.Customer] {
 	return s.repo.List(ctx, limit)
 }
 
 // ListInactive returns deactivated customers ordered by deactivated_at descending.
-func (s *Service) ListInactive(ctx context.Context, limit int64) mo.Result[[]Customer] {
+func (s *Service) ListInactive(ctx context.Context, limit int64) mo.Result[[]domain.Customer] {
 	return s.repo.ListInactive(ctx, limit)
 }
 
 // Deactivate soft-deactivates a customer.
-func (s *Service) Deactivate(ctx context.Context, id string) mo.Result[*Customer] {
+func (s *Service) Deactivate(ctx context.Context, id string) mo.Result[*domain.Customer] {
 	oid, err := parseObjectID(id)
 	if err != nil {
-		return mo.Err[*Customer](err)
+		return mo.Err[*domain.Customer](err)
 	}
 	return s.repo.Deactivate(ctx, oid, time.Now().UTC())
 }

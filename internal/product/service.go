@@ -7,14 +7,40 @@ import (
 	"time"
 
 	"github.com/samber/mo"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Domain errors for mapping to HTTP 400.
 var (
-	ErrInvalidName  = errors.New("product: name is required")
-	ErrInvalidPrice = errors.New("product: price must be non-negative")
+	ErrInvalidName     = errors.New("product: name is required")
+	ErrInvalidPrice    = errors.New("product: price must be non-negative")
+	ErrInvalidObjectID = errors.New("product: invalid object id")
 )
+
+// --- Pure Logic ---
+
+// validateCreateInput trims and validates a CreateInput, returning sanitised fields.
+func validateCreateInput(in CreateInput) (sku, name string, price float64, err error) {
+	name = strings.TrimSpace(in.Name)
+	if name == "" {
+		return "", "", 0, ErrInvalidName
+	}
+	if in.Price < 0 {
+		return "", "", 0, ErrInvalidPrice
+	}
+	return strings.TrimSpace(in.SKU), name, in.Price, nil
+}
+
+// buildProduct constructs a Product value from validated fields.
+func buildProduct(sku, name string, price float64, now time.Time) *Product {
+	return &Product{
+		SKU:       sku,
+		Name:      name,
+		Price:     price,
+		CreatedAt: now,
+	}
+}
+
+// --- Orchestration ---
 
 // Service coordinates product use cases.
 type Service struct {
@@ -26,46 +52,23 @@ func NewService(r Repository) *Service {
 	return &Service{repo: r}
 }
 
-// Create validates input and persists a new product.
+// Create validates input, builds the domain object, and persists it.
 func (s *Service) Create(ctx context.Context, in CreateInput) mo.Result[*Product] {
-	name := strings.TrimSpace(in.Name)
-	if name == "" {
-		return mo.Err[*Product](ErrInvalidName)
+	sku, name, price, err := validateCreateInput(in)
+	if err != nil {
+		return mo.Err[*Product](err)
 	}
-	if in.Price < 0 {
-		return mo.Err[*Product](ErrInvalidPrice)
-	}
-	now := time.Now().UTC()
-	p := &Product{
-		SKU:       strings.TrimSpace(in.SKU),
-		Name:      name,
-		Price:     in.Price,
-		CreatedAt: now,
-	}
+	p := buildProduct(sku, name, price, time.Now().UTC())
 	return s.repo.Create(ctx, p)
 }
 
-// ErrInvalidObjectID is returned when the id string is not a valid ObjectID hex.
-var ErrInvalidObjectID = errors.New("product: invalid object id")
-
-// GetByID loads a product by identifier.
+// GetByID loads a product by its hex ID string.
 func (s *Service) GetByID(ctx context.Context, id string) mo.Result[mo.Option[Product]] {
 	oid, err := parseObjectID(id)
 	if err != nil {
 		return mo.Err[mo.Option[Product]](err)
 	}
 	return s.repo.GetByID(ctx, oid)
-}
-
-func parseObjectID(s string) (primitive.ObjectID, error) {
-	if len(s) != 24 {
-		return primitive.NilObjectID, ErrInvalidObjectID
-	}
-	id, err := primitive.ObjectIDFromHex(s)
-	if err != nil {
-		return primitive.NilObjectID, ErrInvalidObjectID
-	}
-	return id, nil
 }
 
 // GetBySKU loads a product by its SKU string.
@@ -83,7 +86,7 @@ func (s *Service) ListInactive(ctx context.Context, limit int64) mo.Result[[]Pro
 	return s.repo.ListInactive(ctx, limit)
 }
 
-// Activate re-activates a product by clearing deactivated_at. Idempotent.
+// Activate re-activates a product.
 func (s *Service) Activate(ctx context.Context, id string) mo.Result[*Product] {
 	oid, err := parseObjectID(id)
 	if err != nil {
@@ -92,7 +95,7 @@ func (s *Service) Activate(ctx context.Context, id string) mo.Result[*Product] {
 	return s.repo.Activate(ctx, oid)
 }
 
-// Deactivate soft-deactivates a product. Idempotent: returns the updated document each time.
+// Deactivate soft-deactivates a product.
 func (s *Service) Deactivate(ctx context.Context, id string) mo.Result[*Product] {
 	oid, err := parseObjectID(id)
 	if err != nil {
