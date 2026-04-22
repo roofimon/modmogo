@@ -103,14 +103,24 @@ go test ./internal/product/...
 go test -v ./internal/product/...
 ```
 
-Test coverage spans three layers of the product domain:
+Test coverage spans all three domains — product, customer, and order — across four layers each:
 
-| Layer | File | What is tested |
-|-------|------|----------------|
-| Pure logic | `application/id_test.go` | `parseObjectID` — valid hex, invalid hex, empty string |
-| Pure logic + orchestration | `application/service_test.go` | `validateCreateInput`, `buildProduct`, `Service` methods with a mock repository |
-| HTTP handlers | `adapter/http/handlers_test.go` | `parseLimit`, `createErrorToHTTP`, `idErrorToHTTP` |
-| API (routes) | `adapter/http/api_test.go` | All routes via `fiber.App.Test()` with a mock `port.UseCase` |
+| Domain | Layer | File | What is tested |
+|--------|-------|------|----------------|
+| product | Pure logic | `application/id_test.go` | `parseObjectID` |
+| product | Pure logic + orchestration | `application/service_test.go` | `validateCreateInput`, `buildProduct`, `Service` methods with mock repo |
+| product | HTTP handlers | `adapter/http/handlers_test.go` | `parseLimit`, `createErrorToHTTP`, `idErrorToHTTP` |
+| product | API (routes) | `adapter/http/api_test.go` | All routes via `fiber.App.Test()` with mock `port.UseCase` |
+| customer | Pure logic | `application/id_test.go` | `parseObjectID` |
+| customer | Pure logic + orchestration | `application/service_test.go` | `validateCreateInput`, `buildCustomer`, `Service` methods with mock repo |
+| customer | HTTP handlers | `adapter/http/handlers_test.go` | `parseLimit`, `createErrorToHTTP`, `idErrorToHTTP` |
+| customer | API (routes) | `adapter/http/api_test.go` | All routes via `fiber.App.Test()` with mock `port.UseCase` |
+| order | Domain | `domain/model_test.go` | `ComputeTotal` |
+| order | Domain | `domain/view_test.go` | `ToOrderView` — field mapping, enrichment, unknown SKU |
+| order | Pure logic | `application/id_test.go` | `parseObjectID` |
+| order | Orchestration | `application/service_test.go` | `PlaceOrder` validation, `ViewOrderDetail`, `CompletePayment`, `Deactivate` with mock repo and catalogs |
+| order | HTTP handlers | `adapter/http/handlers_test.go` | `parseLimit`, `createErrorToHTTP` (5 errors), `idErrorToHTTP` (400/404/409) |
+| order | API (routes) | `adapter/http/api_test.go` | All 9 routes via `fiber.App.Test()` with mock `port.UseCase` and catalogs |
 
 ## Build
 
