@@ -114,7 +114,7 @@ func (r *MongoRepository) ListInactive(ctx context.Context, limit int64) mo.Resu
 	if limit <= 0 {
 		limit = 50
 	}
-	cur, err := coll.Aggregate(ctx, currentStatePipeline(bson.M{"status": domain.StatusDeactivated}, limit))
+	cur, err := coll.Aggregate(ctx, currentStatePipeline(bson.M{"deactivated_at": bson.M{"$exists": true}}, limit))
 	if err != nil {
 		return mo.Err[[]domain.Order](err)
 	}
