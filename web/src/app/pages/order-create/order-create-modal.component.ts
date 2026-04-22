@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import * as E from 'fp-ts/Either';
+import { pipe } from 'fp-ts/function';
 
 import { CatalogCustomer, CatalogProduct } from '../../models/order';
 import { OrderService } from '../../services/order.service';
@@ -41,12 +42,12 @@ export class OrderCreateModalComponent {
   });
 
   constructor() {
-    this.ordersApi.listProducts().subscribe({
-      next: (items) => this.products.set(items ?? []),
-    });
-    this.ordersApi.listCustomers().subscribe({
-      next: (items) => this.allCustomers.set(items ?? []),
-    });
+    this.ordersApi.listProducts().subscribe((result) =>
+      pipe(result, E.fold(() => {}, (items) => this.products.set(items ?? []))),
+    );
+    this.ordersApi.listCustomers().subscribe((result) =>
+      pipe(result, E.fold(() => {}, (items) => this.allCustomers.set(items ?? []))),
+    );
   }
 
   get items(): FormArray {
@@ -137,10 +138,7 @@ export class OrderCreateModalComponent {
 
   submit(): void {
     this.error.set(null);
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
     const v = this.form.getRawValue();
     const customerId = v.customer_id.trim();
     this.submitting.set(true);
@@ -154,18 +152,14 @@ export class OrderCreateModalComponent {
           unit_price: i['unit_price'] as number,
         })),
       })
-      .subscribe({
-        next: (o) => void this.router.navigate(['/orders', o.id]),
-        error: (e: unknown) => {
-          const msg =
-            e instanceof HttpErrorResponse
-              ? (e.error?.message ?? e.message)
-              : e instanceof Error
-                ? e.message
-                : 'Could not create order';
-          this.error.set(msg);
-          this.submitting.set(false);
-        },
-      });
+      .subscribe((result) =>
+        pipe(
+          result,
+          E.fold(
+            (err) => { this.error.set(err.message); this.submitting.set(false); },
+            (o) => { void this.router.navigate(['/orders', o.id]); },
+          ),
+        ),
+      );
   }
 }

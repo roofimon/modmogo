@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import * as E from 'fp-ts/Either';
+import { pipe } from 'fp-ts/function';
 
 import { Order } from '../../models/order';
 import { OrderService } from '../../services/order.service';
@@ -22,15 +24,14 @@ export class OrderInactiveListComponent {
   readonly showCreateModal = signal(false);
 
   constructor() {
-    this.ordersApi.listInactive(100).subscribe({
-      next: (items) => {
-        this.orders.set(items ?? []);
-        this.loading.set(false);
-      },
-      error: (err: Error) => {
-        this.error.set(err.message ?? 'Failed to load inactive orders');
-        this.loading.set(false);
-      },
-    });
+    this.ordersApi.listInactive(100).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.error.set(err.message); this.loading.set(false); },
+          (items) => { this.orders.set(items ?? []); this.loading.set(false); },
+        ),
+      ),
+    );
   }
 }

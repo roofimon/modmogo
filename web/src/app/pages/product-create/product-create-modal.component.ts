@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import * as E from 'fp-ts/Either';
+import { pipe } from 'fp-ts/function';
 
 import { ProductService } from '../../services/product.service';
 
@@ -35,28 +36,17 @@ export class ProductCreateModalComponent {
 
   submit(): void {
     this.error.set(null);
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
     const v = this.form.getRawValue();
     this.submitting.set(true);
-    this.productsApi
-      .create({ sku: v.sku.trim(), name: v.name.trim(), price: v.price })
-      .subscribe({
-        next: (p) => void this.router.navigate(['/products', p.id]),
-        error: (e: unknown) => {
-          const msg =
-            e instanceof HttpErrorResponse
-              ? typeof e.error === 'string'
-                ? e.error
-                : e.message
-              : e instanceof Error
-                ? e.message
-                : 'Could not create product';
-          this.error.set(msg);
-          this.submitting.set(false);
-        },
-      });
+    this.productsApi.create({ sku: v.sku.trim(), name: v.name.trim(), price: v.price }).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.error.set(err.message); this.submitting.set(false); },
+          (p) => { void this.router.navigate(['/products', p.id]); },
+        ),
+      ),
+    );
   }
 }

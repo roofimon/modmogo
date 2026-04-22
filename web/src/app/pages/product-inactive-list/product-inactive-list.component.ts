@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import * as E from 'fp-ts/Either';
+import { pipe } from 'fp-ts/function';
 
 import { Product } from '../../models/product';
 import { ProductService } from '../../services/product.service';
@@ -25,16 +26,15 @@ export class ProductInactiveListComponent {
   readonly activateError = signal<string | null>(null);
 
   constructor() {
-    this.productsApi.listInactive(100).subscribe({
-      next: (items) => {
-        this.products.set(items ?? []);
-        this.loading.set(false);
-      },
-      error: (err: Error) => {
-        this.error.set(err.message ?? 'Failed to load inactive products');
-        this.loading.set(false);
-      },
-    });
+    this.productsApi.listInactive(100).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.error.set(err.message); this.loading.set(false); },
+          (items) => { this.products.set(items ?? []); this.loading.set(false); },
+        ),
+      ),
+    );
   }
 
   activate(id: string, event: Event): void {
@@ -42,23 +42,14 @@ export class ProductInactiveListComponent {
     event.stopPropagation();
     this.activateError.set(null);
     this.activating.set(id);
-    this.productsApi.activate(id).subscribe({
-      next: () => {
-        this.products.update((list) => list.filter((p) => p.id !== id));
-        this.activating.set(null);
-      },
-      error: (e: unknown) => {
-        const msg =
-          e instanceof HttpErrorResponse
-            ? typeof e.error === 'string'
-              ? e.error
-              : e.message
-            : e instanceof Error
-              ? e.message
-              : 'Could not activate';
-        this.activateError.set(msg);
-        this.activating.set(null);
-      },
-    });
+    this.productsApi.activate(id).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.activateError.set(err.message); this.activating.set(null); },
+          () => { this.products.update((list) => list.filter((p) => p.id !== id)); this.activating.set(null); },
+        ),
+      ),
+    );
   }
 }

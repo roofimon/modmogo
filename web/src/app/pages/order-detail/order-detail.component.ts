@@ -1,10 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { switchMap, throwError } from 'rxjs';
+import * as E from 'fp-ts/Either';
+import { pipe } from 'fp-ts/function';
+import { of, switchMap } from 'rxjs';
 
 import { Order } from '../../models/order';
+import { ApiError } from '../../services/api-error';
 import { OrderService } from '../../services/order.service';
 
 @Component({
@@ -32,30 +34,19 @@ export class OrderDetailComponent {
       .pipe(
         switchMap((params) => {
           const id = params.get('id');
-          if (!id) {
-            return throwError(() => new Error('Missing order id'));
-          }
+          if (!id) return of(E.left<ApiError, Order>({ status: 0, message: 'Missing order id' }));
           return this.ordersApi.getById(id);
         }),
       )
-      .subscribe({
-        next: (o) => {
-          this.order.set(o);
-          this.loading.set(false);
-        },
-        error: (e: unknown) => {
-          const msg =
-            e instanceof HttpErrorResponse
-              ? typeof e.error === 'string'
-                ? e.error
-                : e.message
-              : e instanceof Error
-                ? e.message
-                : 'Failed to load order';
-          this.error.set(msg);
-          this.loading.set(false);
-        },
-      });
+      .subscribe((result) =>
+        pipe(
+          result,
+          E.fold(
+            (err) => { this.error.set(err.message); this.loading.set(false); },
+            (o) => { this.order.set(o); this.loading.set(false); },
+          ),
+        ),
+      );
   }
 
   isInactive(o: Order): boolean {
@@ -75,49 +66,31 @@ export class OrderDetailComponent {
     if (!o || this.isInactive(o) || this.isPaymentCompleted(o)) return;
     this.paymentError.set(null);
     this.paymentSubmitting.set(true);
-    this.ordersApi.completePayment(o.id).subscribe({
-      next: (newOrder) => {
-        this.paymentSubmitting.set(false);
-        void this.router.navigate(['/orders', newOrder.id]);
-      },
-      error: (e: unknown) => {
-        const msg =
-          e instanceof HttpErrorResponse
-            ? (e.error?.message ?? e.message)
-            : e instanceof Error
-              ? e.message
-              : 'Could not complete payment';
-        this.paymentError.set(msg);
-        this.paymentSubmitting.set(false);
-      },
-    });
+    this.ordersApi.completePayment(o.id).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.paymentError.set(err.message); this.paymentSubmitting.set(false); },
+          (newOrder) => { this.paymentSubmitting.set(false); void this.router.navigate(['/orders', newOrder.id]); },
+        ),
+      ),
+    );
   }
 
   confirmDeactivate(): void {
-    if (!confirm('Deactivate this order? It will move to the inactive list.')) {
-      return;
-    }
+    if (!confirm('Deactivate this order? It will move to the inactive list.')) return;
     const o = this.order();
     if (!o) return;
     this.deactivateError.set(null);
     this.deactivateSubmitting.set(true);
-    this.ordersApi.deactivate(o.id).subscribe({
-      next: (updated) => {
-        this.order.set(updated);
-        this.deactivateSubmitting.set(false);
-      },
-      error: (e: unknown) => {
-        const msg =
-          e instanceof HttpErrorResponse
-            ? typeof e.error === 'string'
-              ? e.error
-              : e.message
-            : e instanceof Error
-              ? e.message
-              : 'Could not deactivate';
-        this.deactivateError.set(msg);
-        this.deactivateSubmitting.set(false);
-      },
-    });
+    this.ordersApi.deactivate(o.id).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.deactivateError.set(err.message); this.deactivateSubmitting.set(false); },
+          (updated) => { this.order.set(updated); this.deactivateSubmitting.set(false); },
+        ),
+      ),
+    );
   }
 }

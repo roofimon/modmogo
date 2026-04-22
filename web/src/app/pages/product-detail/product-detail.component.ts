@@ -1,10 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { switchMap, throwError } from 'rxjs';
+import * as E from 'fp-ts/Either';
+import { pipe } from 'fp-ts/function';
+import { of, switchMap } from 'rxjs';
 
 import { Product } from '../../models/product';
+import { ApiError } from '../../services/api-error';
 import { ProductService } from '../../services/product.service';
 
 @Component({
@@ -31,30 +33,19 @@ export class ProductDetailComponent {
       .pipe(
         switchMap((params) => {
           const id = params.get('id');
-          if (!id) {
-            return throwError(() => new Error('Missing product id'));
-          }
+          if (!id) return of(E.left<ApiError, Product>({ status: 0, message: 'Missing product id' }));
           return this.productsApi.getById(id);
         }),
       )
-      .subscribe({
-        next: (p) => {
-          this.product.set(p);
-          this.loading.set(false);
-        },
-        error: (e: unknown) => {
-          const msg =
-            e instanceof HttpErrorResponse
-              ? typeof e.error === 'string'
-                ? e.error
-                : e.message
-              : e instanceof Error
-                ? e.message
-                : 'Failed to load product';
-          this.error.set(msg);
-          this.loading.set(false);
-        },
-      });
+      .subscribe((result) =>
+        pipe(
+          result,
+          E.fold(
+            (err) => { this.error.set(err.message); this.loading.set(false); },
+            (p) => { this.product.set(p); this.loading.set(false); },
+          ),
+        ),
+      );
   }
 
   isInactive(p: Product): boolean {
@@ -62,58 +53,36 @@ export class ProductDetailComponent {
   }
 
   confirmActivate(): void {
-    if (!confirm('Activate this product? It will reappear in the catalog.')) {
-      return;
-    }
+    if (!confirm('Activate this product? It will reappear in the catalog.')) return;
     const p = this.product();
     if (!p) return;
     this.activateError.set(null);
     this.activateSubmitting.set(true);
-    this.productsApi.activate(p.id).subscribe({
-      next: (updated) => {
-        this.product.set(updated);
-        this.activateSubmitting.set(false);
-      },
-      error: (e: unknown) => {
-        const msg =
-          e instanceof HttpErrorResponse
-            ? typeof e.error === 'string'
-              ? e.error
-              : e.message
-            : e instanceof Error
-              ? e.message
-              : 'Could not activate';
-        this.activateError.set(msg);
-        this.activateSubmitting.set(false);
-      },
-    });
+    this.productsApi.activate(p.id).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.activateError.set(err.message); this.activateSubmitting.set(false); },
+          (updated) => { this.product.set(updated); this.activateSubmitting.set(false); },
+        ),
+      ),
+    );
   }
 
   confirmDeactivate(): void {
-    if (!confirm('Deactivate this product? It will disappear from the catalog.')) {
-      return;
-    }
+    if (!confirm('Deactivate this product? It will disappear from the catalog.')) return;
     const p = this.product();
     if (!p) return;
     this.deactivateError.set(null);
     this.deactivateSubmitting.set(true);
-    this.productsApi.deactivate(p.id).subscribe({
-      next: (updated) => {
-        this.product.set(updated);
-        this.deactivateSubmitting.set(false);
-      },
-      error: (e: unknown) => {
-        const msg =
-          e instanceof HttpErrorResponse
-            ? typeof e.error === 'string'
-              ? e.error
-              : e.message
-            : e instanceof Error
-              ? e.message
-              : 'Could not deactivate';
-        this.deactivateError.set(msg);
-        this.deactivateSubmitting.set(false);
-      },
-    });
+    this.productsApi.deactivate(p.id).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.deactivateError.set(err.message); this.deactivateSubmitting.set(false); },
+          (updated) => { this.product.set(updated); this.deactivateSubmitting.set(false); },
+        ),
+      ),
+    );
   }
 }

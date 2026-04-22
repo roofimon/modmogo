@@ -1,10 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { switchMap, throwError } from 'rxjs';
+import * as E from 'fp-ts/Either';
+import { pipe } from 'fp-ts/function';
+import { of, switchMap } from 'rxjs';
 
 import { Customer } from '../../models/customer';
+import { ApiError } from '../../services/api-error';
 import { CustomerService } from '../../services/customer.service';
 
 @Component({
@@ -29,30 +31,19 @@ export class CustomerDetailComponent {
       .pipe(
         switchMap((params) => {
           const id = params.get('id');
-          if (!id) {
-            return throwError(() => new Error('Missing customer id'));
-          }
+          if (!id) return of(E.left<ApiError, Customer>({ status: 0, message: 'Missing customer id' }));
           return this.customersApi.getById(id);
         }),
       )
-      .subscribe({
-        next: (c) => {
-          this.customer.set(c);
-          this.loading.set(false);
-        },
-        error: (e: unknown) => {
-          const msg =
-            e instanceof HttpErrorResponse
-              ? typeof e.error === 'string'
-                ? e.error
-                : e.message
-              : e instanceof Error
-                ? e.message
-                : 'Failed to load customer';
-          this.error.set(msg);
-          this.loading.set(false);
-        },
-      });
+      .subscribe((result) =>
+        pipe(
+          result,
+          E.fold(
+            (err) => { this.error.set(err.message); this.loading.set(false); },
+            (c) => { this.customer.set(c); this.loading.set(false); },
+          ),
+        ),
+      );
   }
 
   isInactive(c: Customer): boolean {
@@ -60,30 +51,19 @@ export class CustomerDetailComponent {
   }
 
   confirmDeactivate(): void {
-    if (!confirm('Deactivate this customer? They will disappear from the directory.')) {
-      return;
-    }
+    if (!confirm('Deactivate this customer? They will disappear from the directory.')) return;
     const c = this.customer();
     if (!c) return;
     this.deactivateError.set(null);
     this.deactivateSubmitting.set(true);
-    this.customersApi.deactivate(c.id).subscribe({
-      next: (updated) => {
-        this.customer.set(updated);
-        this.deactivateSubmitting.set(false);
-      },
-      error: (e: unknown) => {
-        const msg =
-          e instanceof HttpErrorResponse
-            ? typeof e.error === 'string'
-              ? e.error
-              : e.message
-            : e instanceof Error
-              ? e.message
-              : 'Could not deactivate';
-        this.deactivateError.set(msg);
-        this.deactivateSubmitting.set(false);
-      },
-    });
+    this.customersApi.deactivate(c.id).subscribe((result) =>
+      pipe(
+        result,
+        E.fold(
+          (err) => { this.deactivateError.set(err.message); this.deactivateSubmitting.set(false); },
+          (updated) => { this.customer.set(updated); this.deactivateSubmitting.set(false); },
+        ),
+      ),
+    );
   }
 }

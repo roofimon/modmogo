@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import * as E from 'fp-ts/Either';
+import { pipe } from 'fp-ts/function';
 
 import { CustomerService } from '../../services/customer.service';
 
@@ -35,29 +36,20 @@ export class CustomerCreateModalComponent {
 
   submit(): void {
     this.error.set(null);
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
     const v = this.form.getRawValue();
     this.submitting.set(true);
     const phone = v.phone.trim();
     this.customersApi
       .create({ name: v.name.trim(), email: v.email.trim(), ...(phone && { phone }) })
-      .subscribe({
-        next: (c) => void this.router.navigate(['/customers', c.id]),
-        error: (e: unknown) => {
-          const msg =
-            e instanceof HttpErrorResponse
-              ? typeof e.error === 'string'
-                ? e.error
-                : e.message
-              : e instanceof Error
-                ? e.message
-                : 'Could not create customer';
-          this.error.set(msg);
-          this.submitting.set(false);
-        },
-      });
+      .subscribe((result) =>
+        pipe(
+          result,
+          E.fold(
+            (err) => { this.error.set(err.message); this.submitting.set(false); },
+            (c) => { void this.router.navigate(['/customers', c.id]); },
+          ),
+        ),
+      );
   }
 }
