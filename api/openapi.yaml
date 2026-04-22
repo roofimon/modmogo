@@ -1,477 +1,475 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: modmono
-  description: HTTP API for the modmono Fiber service (products, customers, and health probes).
-  version: 0.1.0
+  description: HTTP API for the modmono service (products, customers, orders, and health probes).
+  version: 0.2.0
 servers:
   - url: http://localhost:8080
-    description: Local default (HTTP_ADDR)
 
 paths:
+
+  # ── Products ────────────────────────────────────────────────────────────────
+
   /products:
-    get:
-      summary: List products
-      description: Returns active (non-deactivated) products ordered by creation time descending. Default limit is 50; maximum is 100.
-      operationId: listProducts
-      parameters:
-        - name: limit
-          in: query
-          required: false
-          description: Maximum number of products to return (1–100). Values above 100 are capped at 100.
-          schema:
-            type: integer
-            format: int64
-            minimum: 1
-            maximum: 100
-      responses:
-        "200":
-          description: List of products (may be empty).
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Product"
-        "400":
-          description: Invalid limit query parameter.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: invalid limit
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
     post:
-      summary: Create product
+      summary: Create a product
       operationId: createProduct
+      tags: [Products]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateProductRequest"
+              $ref: '#/components/schemas/CreateProductRequest'
       responses:
-        "201":
-          description: Product created.
+        '201':
+          description: Product created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Product"
-        "400":
-          description: Invalid JSON body or validation error (e.g. empty name, negative price).
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    get:
+      summary: List active products
+      operationId: listProducts
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Active products
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-              examples:
-                invalidJson:
-                  value: invalid JSON body
-                invalidName:
-                  value: product: name is required
-                invalidPrice:
-                  value: product: price must be non-negative
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
 
   /products/inactive:
     get:
       summary: List inactive products
-      description: Returns deactivated products only, ordered by deactivated_at descending (then creation). Same limit rules as GET /products.
       operationId: listInactiveProducts
+      tags: [Products]
       parameters:
-        - name: limit
-          in: query
-          required: false
-          description: Maximum number of products to return (1–100). Values above 100 are capped at 100.
-          schema:
-            type: integer
-            format: int64
-            minimum: 1
-            maximum: 100
+        - $ref: '#/components/parameters/limit'
       responses:
-        "200":
-          description: List of inactive products (may be empty).
+        '200':
+          description: Inactive products
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Product"
-        "400":
-          description: Invalid limit query parameter.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: invalid limit
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
-
-  /products/{id}/activate:
-    post:
-      summary: Activate product
-      description: Clears deactivated_at, restoring the product to the active catalog. Idempotent.
-      operationId: activateProduct
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: MongoDB ObjectID as 24-character hexadecimal string.
-          schema:
-            type: string
-            pattern: '^[a-fA-F0-9]{24}$'
-      responses:
-        "200":
-          description: Product activated (or already active).
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Product"
-        "400":
-          description: ID is not a valid ObjectID hex.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: invalid product id
-        "404":
-          description: Product does not exist.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: product not found
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
-
-  /products/{id}/deactivate:
-    post:
-      summary: Deactivate product
-      description: Soft-deactivates the product (sets deactivated_at). Idempotent; returns the updated product. Deactivated products are omitted from GET /products.
-      operationId: deactivateProduct
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: MongoDB ObjectID as 24-character hexadecimal string.
-          schema:
-            type: string
-            pattern: '^[a-fA-F0-9]{24}$'
-      responses:
-        "200":
-          description: Product deactivated (or already inactive; timestamp may be refreshed).
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Product"
-        "400":
-          description: ID is not a valid ObjectID hex.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: invalid product id
-        "404":
-          description: Product does not exist.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: product not found
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
+                  $ref: '#/components/schemas/Product'
 
   /products/{id}:
     get:
-      summary: Get product by ID
-      operationId: getProductById
+      summary: Get product detail
+      operationId: getProduct
+      tags: [Products]
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: MongoDB ObjectID as 24-character hexadecimal string.
-          schema:
-            type: string
-            pattern: '^[a-fA-F0-9]{24}$'
+        - $ref: '#/components/parameters/id'
       responses:
-        "200":
-          description: Product found.
+        '200':
+          description: Product found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Product"
-        "400":
-          description: ID is not a valid ObjectID hex.
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /products/{id}/deactivate:
+    post:
+      summary: Deactivate a product
+      operationId: deactivateProduct
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Product deactivated
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-              example: invalid product id
-        "404":
-          description: Product does not exist.
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /products/{id}/activate:
+    post:
+      summary: Activate a product
+      operationId: activateProduct
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Product activated
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-              example: product not found
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Customers ───────────────────────────────────────────────────────────────
 
   /customers:
-    get:
-      summary: List customers
-      description: Returns active (non-deactivated) customers ordered by creation time descending. Default limit is 50; maximum is 100.
-      operationId: listCustomers
-      parameters:
-        - name: limit
-          in: query
-          required: false
-          description: Maximum number of customers to return (1–100). Values above 100 are capped at 100.
-          schema:
-            type: integer
-            format: int64
-            minimum: 1
-            maximum: 100
-      responses:
-        "200":
-          description: List of customers (may be empty).
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Customer"
-        "400":
-          description: Invalid limit query parameter.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: invalid limit
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
     post:
-      summary: Create customer
+      summary: Create a customer
       operationId: createCustomer
+      tags: [Customers]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateCustomerRequest"
+              $ref: '#/components/schemas/CreateCustomerRequest'
       responses:
-        "201":
-          description: Customer created.
+        '201':
+          description: Customer created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Customer"
-        "400":
-          description: Invalid JSON body or validation error (e.g. empty name or email).
-          content:
-            text/plain:
-              schema:
-                type: string
-              examples:
-                invalidJson:
-                  value: invalid JSON body
-                invalidName:
-                  value: customer: name is required
-                invalidEmail:
-                  value: customer: email is required
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
-  /customers/inactive:
     get:
-      summary: List inactive customers
-      description: Returns deactivated customers only, ordered by deactivated_at descending. Same limit rules as GET /customers.
-      operationId: listInactiveCustomers
+      summary: List active customers
+      operationId: listCustomers
+      tags: [Customers]
       parameters:
-        - name: limit
-          in: query
-          required: false
-          description: Maximum number of customers to return (1–100). Values above 100 are capped at 100.
-          schema:
-            type: integer
-            format: int64
-            minimum: 1
-            maximum: 100
+        - $ref: '#/components/parameters/limit'
       responses:
-        "200":
-          description: List of inactive customers (may be empty).
+        '200':
+          description: Active customers
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Customer"
-        "400":
-          description: Invalid limit query parameter.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: invalid limit
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
+                  $ref: '#/components/schemas/Customer'
 
-  /customers/{id}/deactivate:
-    post:
-      summary: Deactivate customer
-      description: Soft-deactivates the customer (sets deactivated_at). Idempotent; returns the updated customer. Deactivated customers are omitted from GET /customers.
-      operationId: deactivateCustomer
+  /customers/inactive:
+    get:
+      summary: List inactive customers
+      operationId: listInactiveCustomers
+      tags: [Customers]
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: MongoDB ObjectID as 24-character hexadecimal string.
-          schema:
-            type: string
-            pattern: '^[a-fA-F0-9]{24}$'
+        - $ref: '#/components/parameters/limit'
       responses:
-        "200":
-          description: Customer deactivated (or already inactive; timestamp may be refreshed).
+        '200':
+          description: Inactive customers
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Customer"
-        "400":
-          description: ID is not a valid ObjectID hex.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: invalid customer id
-        "404":
-          description: Customer does not exist.
-          content:
-            text/plain:
-              schema:
-                type: string
-              example: customer not found
-        "500":
-          description: Server or database error.
-          content:
-            text/plain:
-              schema:
-                type: string
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
 
   /customers/{id}:
     get:
-      summary: Get customer by ID
-      operationId: getCustomerById
+      summary: Get customer detail
+      operationId: getCustomer
+      tags: [Customers]
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: MongoDB ObjectID as 24-character hexadecimal string.
-          schema:
-            type: string
-            pattern: '^[a-fA-F0-9]{24}$'
+        - $ref: '#/components/parameters/id'
       responses:
-        "200":
-          description: Customer found.
+        '200':
+          description: Customer found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Customer"
-        "400":
-          description: ID is not a valid ObjectID hex.
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers/{id}/deactivate:
+    post:
+      summary: Deactivate a customer
+      operationId: deactivateCustomer
+      tags: [Customers]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Customer deactivated
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-              example: invalid customer id
-        "404":
-          description: Customer does not exist.
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Orders ──────────────────────────────────────────────────────────────────
+
+  /orders:
+    post:
+      summary: Place an order
+      operationId: placeOrder
+      tags: [Orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order placed
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-              example: customer not found
-        "500":
-          description: Server or database error.
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    get:
+      summary: List active orders
+      operationId: listOrders
+      tags: [Orders]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Active orders
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+
+  /orders/inactive:
+    get:
+      summary: List inactive (deactivated) orders
+      operationId: listInactiveOrders
+      tags: [Orders]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Inactive orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+
+  /orders/payment-completed:
+    get:
+      summary: List payment-completed orders
+      operationId: listPaymentCompletedOrders
+      tags: [Orders]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Payment-completed orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+
+  /orders/products:
+    get:
+      summary: List active products available for ordering
+      operationId: listOrderProducts
+      tags: [Orders]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Available products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogProduct'
+
+  /orders/customers:
+    get:
+      summary: List active customers available for ordering
+      operationId: listOrderCustomers
+      tags: [Orders]
+      parameters:
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Available customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogCustomer'
+
+  /orders/{id}:
+    get:
+      summary: Get order detail
+      operationId: getOrder
+      tags: [Orders]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Order found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderView'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{id}/complete-payment:
+    post:
+      summary: Complete payment for an order
+      operationId: completePayment
+      tags: [Orders]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '201':
+          description: Payment completed — new order record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /orders/{id}/deactivate:
+    post:
+      summary: Deactivate an order
+      operationId: deactivateOrder
+      tags: [Orders]
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Order deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Health ──────────────────────────────────────────────────────────────────
 
   /health/live:
     get:
       summary: Liveness probe
       operationId: healthLive
+      tags: [Health]
       responses:
-        "200":
-          description: Process is alive (empty body).
+        '200':
+          description: Service is alive
 
   /health/ready:
     get:
       summary: Readiness probe
-      description: Verifies MongoDB connectivity with a short ping after resolving the lazy client.
       operationId: healthReady
+      tags: [Health]
       responses:
-        "200":
-          description: MongoDB is reachable.
-        "503":
-          description: Not ready (e.g. MongoDB unavailable).
+        '200':
+          description: Service is ready
+        '503':
+          description: Service is not ready
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-              example: not ready
+                $ref: '#/components/schemas/Error'
 
 components:
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      description: 24-character hex MongoDB ObjectID
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{24}$'
+        example: '507f1f77bcf86cd799439011'
+
+    limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of results to return
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Conflict:
+      description: Conflict — resource already in target state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
   schemas:
+
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    # ── Product schemas ──────────────────────────────────────────────────────
+
     Product:
       type: object
-      required:
-        - id
-        - sku
-        - name
-        - price
-        - created_at
+      required: [id, sku, name, price, status, created_at]
       properties:
         id:
           type: string
-          description: MongoDB ObjectID as hex string.
-          example: 507f1f77bcf86cd799439011
         sku:
           type: string
         name:
@@ -479,21 +477,24 @@ components:
         price:
           type: number
           format: double
+          minimum: 0
+        status:
+          type: string
+          enum: [active, deactivated]
+        original_id:
+          type: string
+          nullable: true
         created_at:
           type: string
           format: date-time
-          description: UTC timestamp set by the server on create.
         deactivated_at:
           type: string
           format: date-time
           nullable: true
-          description: When set, the product is inactive and excluded from list.
 
     CreateProductRequest:
       type: object
-      required:
-        - name
-        - price
+      required: [sku, name, price]
       properties:
         sku:
           type: string
@@ -504,41 +505,196 @@ components:
           format: double
           minimum: 0
 
+    # ── Customer schemas ─────────────────────────────────────────────────────
+
     Customer:
       type: object
-      required:
-        - id
-        - name
-        - email
-        - created_at
+      required: [id, name, email, status, created_at]
       properties:
         id:
           type: string
-          description: MongoDB ObjectID as hex string.
-          example: 507f1f77bcf86cd799439011
         name:
           type: string
         email:
           type: string
           format: email
+        phone:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, deactivated]
+        original_id:
+          type: string
+          nullable: true
         created_at:
           type: string
           format: date-time
-          description: UTC timestamp set by the server on create.
         deactivated_at:
           type: string
           format: date-time
           nullable: true
-          description: When set, the customer is inactive and excluded from list.
 
     CreateCustomerRequest:
       type: object
-      required:
-        - name
-        - email
+      required: [name, email]
       properties:
         name:
           type: string
         email:
           type: string
           format: email
+        phone:
+          type: string
+
+    # ── Order schemas ────────────────────────────────────────────────────────
+
+    LineItem:
+      type: object
+      required: [sku, quantity, unit_price]
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unit_price:
+          type: number
+          format: double
+          minimum: 0
+
+    LineItemInput:
+      type: object
+      required: [sku, quantity, unit_price]
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unit_price:
+          type: number
+          format: double
+          minimum: 0
+
+    LineItemView:
+      type: object
+      required: [sku, quantity, unit_price]
+      properties:
+        sku:
+          type: string
+        product_name:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+          minimum: 1
+        unit_price:
+          type: number
+          format: double
+          minimum: 0
+
+    Order:
+      type: object
+      required: [id, items, total, created_at]
+      properties:
+        id:
+          type: string
+        customer_id:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+        total:
+          type: number
+          format: double
+        status:
+          type: string
+          nullable: true
+        original_order_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        deactivated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    OrderView:
+      type: object
+      required: [id, items, total, created_at]
+      properties:
+        id:
+          type: string
+        customer_id:
+          type: string
+          nullable: true
+        customer_name:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItemView'
+        total:
+          type: number
+          format: double
+        status:
+          type: string
+          nullable: true
+        original_order_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        deactivated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateOrderRequest:
+      type: object
+      required: [items]
+      properties:
+        customer_id:
+          type: string
+          description: 24-character hex MongoDB ObjectID
+          pattern: '^[0-9a-f]{24}$'
+          nullable: true
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/LineItemInput'
+
+    # ── Catalog schemas (order creation helpers) ─────────────────────────────
+
+    CatalogProduct:
+      type: object
+      required: [sku, name, price]
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+          format: double
+          minimum: 0
+
+    CatalogCustomer:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
