@@ -83,6 +83,35 @@ bun run build
 
 Output is under `web/dist/web/`.
 
+## Tests
+
+### Run all tests
+
+```bash
+go test ./...
+```
+
+### Run product domain tests only
+
+```bash
+go test ./internal/product/...
+```
+
+### Run with verbose output
+
+```bash
+go test -v ./internal/product/...
+```
+
+Test coverage spans three layers of the product domain:
+
+| Layer | File | What is tested |
+|-------|------|----------------|
+| Pure logic | `application/id_test.go` | `parseObjectID` — valid hex, invalid hex, empty string |
+| Pure logic + orchestration | `application/service_test.go` | `validateCreateInput`, `buildProduct`, `Service` methods with a mock repository |
+| HTTP handlers | `adapter/http/handlers_test.go` | `parseLimit`, `createErrorToHTTP`, `idErrorToHTTP` |
+| API (routes) | `adapter/http/api_test.go` | All routes via `fiber.App.Test()` with a mock `port.UseCase` |
+
 ## Build
 
 ```bash
