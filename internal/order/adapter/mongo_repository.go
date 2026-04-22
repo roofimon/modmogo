@@ -95,8 +95,11 @@ func (r *MongoRepository) List(ctx context.Context, limit int64) mo.Result[[]dom
 	if limit <= 0 {
 		limit = 50
 	}
-	statusFilter := bson.M{"$or": []bson.M{{"status": bson.M{"$exists": false}}, {"status": ""}}}
-	cur, err := coll.Aggregate(ctx, currentStatePipeline(statusFilter, limit))
+	activeFilter := bson.M{
+		"original_order_id": bson.M{"$exists": false},
+		"deactivated_at":    bson.M{"$exists": false},
+	}
+	cur, err := coll.Aggregate(ctx, currentStatePipeline(activeFilter, limit))
 	if err != nil {
 		return mo.Err[[]domain.Order](err)
 	}

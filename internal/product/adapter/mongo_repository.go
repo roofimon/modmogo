@@ -33,7 +33,11 @@ func (r *MongoRepository) collection(ctx context.Context) (*mongodriver.Collecti
 	return client.Database(r.dbName).Collection("products"), nil
 }
 
-func currentStatePipeline(status string, limit int64) mongodriver.Pipeline {
+func currentStatePipeline(statusMatch bson.M, limit int64) mongodriver.Pipeline {
+	match := bson.M{"_successors": bson.M{"$size": 0}}
+	for k, v := range statusMatch {
+		match[k] = v
+	}
 	return mongodriver.Pipeline{
 		{{Key: "$lookup", Value: bson.D{
 			{Key: "from", Value: "products"},
@@ -41,10 +45,7 @@ func currentStatePipeline(status string, limit int64) mongodriver.Pipeline {
 			{Key: "foreignField", Value: "original_id"},
 			{Key: "as", Value: "_successors"},
 		}}},
-		{{Key: "$match", Value: bson.M{
-			"_successors": bson.M{"$size": 0},
-			"status":      status,
-		}}},
+		{{Key: "$match", Value: match}},
 		{{Key: "$sort", Value: bson.D{{Key: "created_at", Value: -1}}}},
 		{{Key: "$limit", Value: limit}},
 	}
@@ -109,7 +110,8 @@ func (r *MongoRepository) List(ctx context.Context, limit int64) mo.Result[[]dom
 	if limit <= 0 {
 		limit = 50
 	}
-	cur, err := coll.Aggregate(ctx, currentStatePipeline(domain.StatusActive, limit))
+	activeFilter := bson.M{"$or": []bson.M{{"status": domain.StatusActive}, {"status": bson.M{"$exists": false}}, {"status": ""}}}
+	cur, err := coll.Aggregate(ctx, currentStatePipeline(activeFilter, limit))
 	if err != nil {
 		return mo.Err[[]domain.Product](err)
 	}
@@ -124,7 +126,7 @@ func (r *MongoRepository) ListInactive(ctx context.Context, limit int64) mo.Resu
 	if limit <= 0 {
 		limit = 50
 	}
-	cur, err := coll.Aggregate(ctx, currentStatePipeline(domain.StatusDeactivated, limit))
+	cur, err := coll.Aggregate(ctx, currentStatePipeline(bson.M{"status": domain.StatusDeactivated}, limit))
 	if err != nil {
 		return mo.Err[[]domain.Product](err)
 	}
