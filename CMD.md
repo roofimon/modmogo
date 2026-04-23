@@ -56,3 +56,11 @@ db.products.aggregate([
   })
 })
 ```
+
+### Remove Document 
+```javascript
+// remove one document by id
+db.products.deleteOne({ _id: ObjectId("69e5fb386567c30f46743ef7") })
+
+// remove many documents by sku prefix
+db.products.deleteMany({ sku: { $regex: "^SEED" } })
