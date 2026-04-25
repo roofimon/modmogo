@@ -1,5 +1,10 @@
 # Useful Command Line
 
+## RUN TEST
+- CHROME_BIN=/usr/bin/chromium-browser bun run test
+- npx playwright test --config=playwright.config.ts
+
+
 ## MongoDB
 
 ### Open Mongo Shell

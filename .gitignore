@@ -1,0 +1,10 @@
+.env
+.env.local
+dist/
+web/dist/
+web/node_modules/
+*.test.bin
+web/playwright-report/
+web/test-results/
+nextweb/node_modules/
+nextweb/.next/

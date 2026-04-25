@@ -16,19 +16,20 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 
-	customeradapter "modmono/internal/customer/adapter"
-	customerhttp "modmono/internal/customer/adapter/http"
-	customerapplication "modmono/internal/customer/application"
-	"modmono/internal/health"
-	orderadapter "modmono/internal/order/adapter"
-	ordercatalog "modmono/internal/order/adapter/catalog"
-	orderhttp "modmono/internal/order/adapter/http"
-	orderapplication "modmono/internal/order/application"
-	orderport "modmono/internal/order/port"
-	platformmongo "modmono/internal/platform/mongo"
-	productadapter "modmono/internal/product/adapter"
-	producthttp "modmono/internal/product/adapter/http"
-	productapplication "modmono/internal/product/application"
+	customeradapter "modmono/domain/customer/adapter"
+	customerhttp "modmono/domain/customer/adapter/http"
+	customerapplication "modmono/domain/customer/application"
+	"modmono/domain/health"
+	orderadapter "modmono/domain/order/adapter"
+	ordercatalog "modmono/domain/order/adapter/catalog"
+	orderhttp "modmono/domain/order/adapter/http"
+	orderapplication "modmono/domain/order/application"
+	orderport "modmono/domain/order/port"
+	platformevent "modmono/domain/platform/event"
+	platformmongo "modmono/domain/platform/mongo"
+	productadapter "modmono/domain/product/adapter"
+	producthttp "modmono/domain/product/adapter/http"
+	productapplication "modmono/domain/product/application"
 )
 
 type config struct {
@@ -43,11 +44,12 @@ func run(ctx context.Context) error {
 	lazy := platformmongo.NewLazyClient(cfg.MongoURI)
 	defer lazy.Disconnect()
 
-	productSvc      := newProductService(lazy, cfg.MongoDB)
-	customerSvc     := newCustomerService(lazy, cfg.MongoDB)
+	pub             := platformevent.LogPublisher{}
+	productSvc      := newProductService(lazy, cfg.MongoDB, pub)
+	customerSvc     := newCustomerService(lazy, cfg.MongoDB, pub)
 	productCatalog  := ordercatalog.NewProductCatalogAdapter(productSvc)
 	customerCatalog := ordercatalog.NewCustomerCatalogAdapter(customerSvc)
-	orderSvc        := newOrderService(lazy, cfg.MongoDB, productCatalog, customerCatalog)
+	orderSvc        := newOrderService(lazy, cfg.MongoDB, productCatalog, customerCatalog, pub)
 
 	app := newFiberApp(productSvc, customerSvc, orderSvc, productCatalog, customerCatalog, lazy, cfg)
 	return runHTTPServer(ctx, app, cfg.HTTPAddr)
@@ -87,19 +89,19 @@ func corsAllowOrigins(csv string) string {
 	return strings.Join(out, ",")
 }
 
-func newProductService(lazy *platformmongo.LazyClient, dbName string) *productapplication.Service {
+func newProductService(lazy *platformmongo.LazyClient, dbName string, pub platformevent.Publisher) *productapplication.Service {
 	repo := productadapter.NewMongoRepository(lazy, dbName)
-	return productapplication.NewService(repo)
+	return productapplication.NewService(repo, pub)
 }
 
-func newCustomerService(lazy *platformmongo.LazyClient, dbName string) *customerapplication.Service {
+func newCustomerService(lazy *platformmongo.LazyClient, dbName string, pub platformevent.Publisher) *customerapplication.Service {
 	repo := customeradapter.NewMongoRepository(lazy, dbName)
-	return customerapplication.NewService(repo)
+	return customerapplication.NewService(repo, pub)
 }
 
-func newOrderService(lazy *platformmongo.LazyClient, dbName string, products orderport.ProductCatalog, customers orderport.CustomerCatalog) *orderapplication.Service {
+func newOrderService(lazy *platformmongo.LazyClient, dbName string, products orderport.ProductCatalog, customers orderport.CustomerCatalog, pub platformevent.Publisher) *orderapplication.Service {
 	repo := orderadapter.NewMongoRepository(lazy, dbName)
-	return orderapplication.NewService(repo, products, customers)
+	return orderapplication.NewService(repo, products, customers, pub)
 }
 
 func newFiberApp(

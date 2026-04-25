@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"go.mongodb.org/mongo-driver/bson"
-	platformmongo "modmono/internal/platform/mongo"
+	platformmongo "modmono/domain/platform/mongo"
 )
 
 type config struct {

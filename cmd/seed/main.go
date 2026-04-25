@@ -5,9 +5,9 @@ import (
 	"log"
 	"os"
 
-	platformmongo "modmono/internal/platform/mongo"
-	productadapter "modmono/internal/product/adapter"
-	productdomain "modmono/internal/product/domain"
+	platformmongo "modmono/domain/platform/mongo"
+	productadapter "modmono/domain/product/adapter"
+	productdomain "modmono/domain/product/domain"
 )
 
 // seedRows are demo catalog items with vendor-style SKUs.
