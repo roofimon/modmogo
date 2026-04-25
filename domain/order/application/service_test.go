@@ -18,6 +18,12 @@ type noopPublisher struct{}
 
 func (noopPublisher) Publish(_ context.Context, _ event.Event) {}
 
+type spyPublisher struct{ events []event.Event }
+
+func (s *spyPublisher) Publish(_ context.Context, e event.Event) {
+	s.events = append(s.events, e)
+}
+
 // --- mock repository ---
 
 type mockRepo struct {
@@ -170,44 +176,37 @@ func TestService_PlaceOrder_invalidCustomerID(t *testing.T) {
 }
 
 func TestService_PlaceOrder_valid(t *testing.T) {
-	want := &domain.Order{ID: primitive.NewObjectID()}
-	repo := &mockRepo{
-		createFn: func(_ context.Context, _ *domain.Order) mo.Result[*domain.Order] {
-			return mo.Ok(want)
-		},
-	}
-	svc := newSvc(repo)
+	spy := &spyPublisher{}
+	svc := NewService(&mockRepo{}, &mockProductCatalog{}, &mockCustomerCatalog{}, spy)
 	res := svc.PlaceOrder(context.Background(), domain.CreateInput{
 		Items: []domain.LineItemInput{{SKU: "SKU1", Quantity: 2, UnitPrice: 9.99}},
 	})
 	if res.IsError() {
 		t.Fatalf("unexpected error: %v", res.Error())
 	}
-	if res.MustGet() != want {
-		t.Error("expected repo result to be returned")
+	if res.MustGet().ID.IsZero() {
+		t.Error("expected pre-generated order ID")
+	}
+	if len(spy.events) != 1 || spy.events[0].Type != domain.EventOrderPlaced {
+		t.Errorf("expected OrderPlaced event, got %v", spy.events)
 	}
 }
 
 func TestService_PlaceOrder_validWithCustomerID(t *testing.T) {
 	customerID := primitive.NewObjectID()
 	hexID := customerID.Hex()
-	var capturedOrder *domain.Order
-	repo := &mockRepo{
-		createFn: func(_ context.Context, o *domain.Order) mo.Result[*domain.Order] {
-			capturedOrder = o
-			return mo.Ok(o)
-		},
-	}
-	svc := newSvc(repo)
-	svc.PlaceOrder(context.Background(), domain.CreateInput{
+	spy := &spyPublisher{}
+	svc := NewService(&mockRepo{}, &mockProductCatalog{}, &mockCustomerCatalog{}, spy)
+	res := svc.PlaceOrder(context.Background(), domain.CreateInput{
 		CustomerID: &hexID,
 		Items:      []domain.LineItemInput{{SKU: "SKU1", Quantity: 1, UnitPrice: 5.0}},
 	})
-	if capturedOrder == nil {
-		t.Fatal("repo.Create was not called")
+	if res.IsError() {
+		t.Fatalf("unexpected error: %v", res.Error())
 	}
-	if capturedOrder.CustomerID == nil || *capturedOrder.CustomerID != customerID {
-		t.Errorf("expected CustomerID %v, got %v", customerID, capturedOrder.CustomerID)
+	payload := spy.events[0].Payload.(domain.OrderPlaced)
+	if payload.Order.CustomerID == nil || *payload.Order.CustomerID != customerID {
+		t.Errorf("expected CustomerID %v in event payload", customerID)
 	}
 }
 

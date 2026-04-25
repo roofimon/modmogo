@@ -9,8 +9,8 @@ const (
 )
 
 type OrderPlaced struct {
-	OrderID    string
-	CustomerID *string
+	Order      Order   // full order — carried for the save handler
+	CustomerID *string // kept for observability consumers
 	Total      float64
 }
 

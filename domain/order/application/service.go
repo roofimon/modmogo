@@ -72,26 +72,24 @@ func (s *Service) PlaceOrder(ctx context.Context, in domain.CreateInput) mo.Resu
 	}
 
 	o := &domain.Order{
+		ID:         primitive.NewObjectID(),
 		CustomerID: customerOID,
 		Items:      items,
 		CreatedAt:  time.Now().UTC(),
 	}
-	result := s.repo.Create(ctx, o)
-	if !result.IsError() {
-		placed := result.MustGet()
-		placed.ComputeTotal()
-		var cidStr *string
-		if placed.CustomerID != nil {
-			s := placed.CustomerID.Hex()
-			cidStr = &s
-		}
-		s.publisher.Publish(ctx, event.Event{
-			Type:       domain.EventOrderPlaced,
-			OccurredAt: time.Now().UTC(),
-			Payload:    domain.OrderPlaced{OrderID: placed.ID.Hex(), CustomerID: cidStr, Total: placed.Total},
-		})
+	o.ComputeTotal()
+
+	var cidStr *string
+	if o.CustomerID != nil {
+		h := o.CustomerID.Hex()
+		cidStr = &h
 	}
-	return result
+	s.publisher.Publish(ctx, event.Event{
+		Type:       domain.EventOrderPlaced,
+		OccurredAt: time.Now().UTC(),
+		Payload:    domain.OrderPlaced{Order: *o, CustomerID: cidStr, Total: o.Total},
+	})
+	return mo.Ok(o)
 }
 
 // ViewOrderDetail loads an order by its hex ID and enriches it with customer and product names.

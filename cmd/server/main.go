@@ -24,8 +24,10 @@ import (
 	ordercatalog "modmono/domain/order/adapter/catalog"
 	orderhttp "modmono/domain/order/adapter/http"
 	orderapplication "modmono/domain/order/application"
+	orderdomain "modmono/domain/order/domain"
 	orderport "modmono/domain/order/port"
 	platformevent "modmono/domain/platform/event"
+	"modmono/domain/platform/eventhandler"
 	platformmongo "modmono/domain/platform/mongo"
 	productadapter "modmono/domain/product/adapter"
 	producthttp "modmono/domain/product/adapter/http"
@@ -44,12 +46,16 @@ func run(ctx context.Context) error {
 	lazy := platformmongo.NewLazyClient(cfg.MongoURI)
 	defer lazy.Disconnect()
 
-	pub             := platformevent.LogPublisher{}
-	productSvc      := newProductService(lazy, cfg.MongoDB, pub)
-	customerSvc     := newCustomerService(lazy, cfg.MongoDB, pub)
+	bus := platformevent.NewEventBus()
+	bus.Subscribe(platformevent.Wildcard, eventhandler.LogHandler{})
+
+	productSvc      := newProductService(lazy, cfg.MongoDB, bus)
+	customerSvc     := newCustomerService(lazy, cfg.MongoDB, bus)
 	productCatalog  := ordercatalog.NewProductCatalogAdapter(productSvc)
 	customerCatalog := ordercatalog.NewCustomerCatalogAdapter(customerSvc)
-	orderSvc        := newOrderService(lazy, cfg.MongoDB, productCatalog, customerCatalog, pub)
+	orderRepo       := orderadapter.NewMongoRepository(lazy, cfg.MongoDB)
+	bus.Subscribe(orderdomain.EventOrderPlaced, orderadapter.NewOrderSaveHandler(orderRepo))
+	orderSvc        := orderapplication.NewService(orderRepo, productCatalog, customerCatalog, bus)
 
 	app := newFiberApp(productSvc, customerSvc, orderSvc, productCatalog, customerCatalog, lazy, cfg)
 	return runHTTPServer(ctx, app, cfg.HTTPAddr)
@@ -99,10 +105,6 @@ func newCustomerService(lazy *platformmongo.LazyClient, dbName string, pub platf
 	return customerapplication.NewService(repo, pub)
 }
 
-func newOrderService(lazy *platformmongo.LazyClient, dbName string, products orderport.ProductCatalog, customers orderport.CustomerCatalog, pub platformevent.Publisher) *orderapplication.Service {
-	repo := orderadapter.NewMongoRepository(lazy, dbName)
-	return orderapplication.NewService(repo, products, customers, pub)
-}
 
 func newFiberApp(
 	productSvc      *productapplication.Service,
